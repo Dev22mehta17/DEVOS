@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+.venv/
+venv/
+env/
+
+# Build outputs
+frontend/dist/
+dist/
+
+# Python cache & bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Environment variables & local user data
+.env
+.env.local
+*.log
+
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride

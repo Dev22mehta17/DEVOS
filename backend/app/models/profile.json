@@ -1,0 +1,38 @@
+{
+  "personal": {
+    "full_name": "Dev Mehta",
+    "email_primary": "dev@example.com",
+    "email_secondary": "dev.work@example.com",
+    "phone": "+91-9876543210",
+    "location": "Punjab, India",
+    "work_authorization": "Authorized to work in India & US Remote"
+  },
+  "education": {
+    "university": "Thapar University",
+    "degree": "B.E. Computer Engineering",
+    "graduation_year": "2026",
+    "gpa": "3.8/4.0",
+    "coursework": ["Data Structures", "Algorithms", "Operating Systems", "Database Management Systems", "Distributed Systems"]
+  },
+  "professional": {
+    "current_role": "SDE Intern",
+    "current_company": "Amazon",
+    "total_experience": "1 year (Internship + Projects)",
+    "notice_period": "Immediate / 15 Days",
+    "expected_salary": "Negotiable / Standard Industry Rate",
+    "skills": ["Python", "FastAPI", "JavaScript", "React", "Playwright", "PostgreSQL", "System Design", "Docker", "Git"],
+    "experience_summary": "SDE Intern at Amazon working on backend distributed systems, REST APIs, and microservices architecture. Strong problem-solving background in data structures and algorithm design."
+  },
+  "links": {
+    "github": "https://github.com/devmehta",
+    "linkedin": "https://linkedin.com/in/devmehta",
+    "portfolio": "https://devmehta.dev"
+  },
+  "documents": {
+    "default_resume_filename": "Dev_Resume.pdf",
+    "preferred_search_dirs": [
+      "/Users/devmehta/Downloads",
+      "/Users/devmehta/Documents"
+    ]
+  }
+}
