@@ -106,11 +106,26 @@ class MemoryEngine:
 
             for line in lines:
                 l_lower = line.lower()
-                if any(u in l_lower for u in ["university", "college", "institute", "thapar"]):
+                # Skip bullet points or project lines when parsing university name
+                if any(line.startswith(c) for c in ['•', '-', '*', '1.', '2.']):
+                    continue
+                if any(kw in l_lower for kw in ['activities', 'executed', 'built', 'project', 'developed', 'lead', 'worked']):
+                    continue
+                if any(u in l_lower for u in ["university", "college", "institute", "thapar", "iit", "nit", "school"]):
                     self.profile_data["education"]["university"] = line
-                if any(d in l_lower for d in ["b.e.", "b.tech", "bachelor", "degree", "computer engineering", "computer science"]):
-                    self.profile_data["education"]["degree"] = line
+                    break
 
+            for line in lines:
+                l_lower = line.lower()
+                if any(line.startswith(c) for c in ['•', '-', '*', '1.', '2.']):
+                    continue
+                if any(kw in l_lower for kw in ['activities', 'executed', 'built', 'project', 'developed']):
+                    continue
+                if any(d in l_lower for d in ["b.e.", "b.tech", "bachelor", "m.tech", "master", "computer engineering", "computer science"]):
+                    self.profile_data["education"]["degree"] = line
+                    break
+
+            self.profile_data["documents"]["active_resume_path"] = filename
             self.profile_data["professional"]["experience_summary"] = text[:400].replace("\n", " ").strip()
             self.save_profile(self.profile_data)
 

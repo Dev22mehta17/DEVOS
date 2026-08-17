@@ -79,7 +79,7 @@ export default function MemoryManager({ profile, onSave }) {
       </div>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', fontSize: '0.88rem' }}>
-        {/* Personal */}
+        {/* Personal Details */}
         <div>
           <div style={{ color: 'var(--accent-cyan)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
             <User size={16} /> Personal Details
@@ -93,17 +93,24 @@ export default function MemoryManager({ profile, onSave }) {
           />
           <input
             className="prompt-input"
-            style={{ width: '100%' }}
+            style={{ width: '100%', marginBottom: '0.4rem' }}
             value={memoryData.personal?.email_primary || ''}
             onChange={(e) => handleChange('personal', 'email_primary', e.target.value)}
             placeholder="Primary Email"
           />
+          <input
+            className="prompt-input"
+            style={{ width: '100%' }}
+            value={memoryData.personal?.phone || ''}
+            onChange={(e) => handleChange('personal', 'phone', e.target.value)}
+            placeholder="Phone Number (e.g. +91-7206049507)"
+          />
         </div>
 
-        {/* Education */}
+        {/* Education & Experience */}
         <div>
           <div style={{ color: 'var(--accent-purple)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
-            <GraduationCap size={16} /> Education
+            <GraduationCap size={16} /> Education & Experience
           </div>
           <input
             className="prompt-input"
@@ -114,14 +121,21 @@ export default function MemoryManager({ profile, onSave }) {
           />
           <input
             className="prompt-input"
-            style={{ width: '100%' }}
+            style={{ width: '100%', marginBottom: '0.4rem' }}
             value={memoryData.education?.degree || ''}
             onChange={(e) => handleChange('education', 'degree', e.target.value)}
             placeholder="Degree"
           />
+          <input
+            className="prompt-input"
+            style={{ width: '100%' }}
+            value={memoryData.professional?.current_role || ''}
+            onChange={(e) => handleChange('professional', 'current_role', e.target.value)}
+            placeholder="Current Role / Experience (e.g. SDE Intern at Amazon)"
+          />
         </div>
 
-        {/* Links */}
+        {/* Social Links */}
         <div>
           <div style={{ color: 'var(--accent-amber)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
             <LinkIcon size={16} /> Social Links
@@ -131,14 +145,14 @@ export default function MemoryManager({ profile, onSave }) {
             style={{ width: '100%', marginBottom: '0.4rem' }}
             value={memoryData.links?.github || ''}
             onChange={(e) => handleChange('links', 'github', e.target.value)}
-            placeholder="GitHub URL"
+            placeholder="GitHub URL (e.g. https://github.com/Dev22mehta17)"
           />
           <input
             className="prompt-input"
             style={{ width: '100%' }}
             value={memoryData.links?.linkedin || ''}
             onChange={(e) => handleChange('links', 'linkedin', e.target.value)}
-            placeholder="LinkedIn URL"
+            placeholder="LinkedIn URL (e.g. https://linkedin.com/in/DevMehta)"
           />
         </div>
 
