@@ -79,12 +79,12 @@ export default function App() {
     }
   };
 
-  const handleApproveAction = async (actionId) => {
+  const handleApproveAction = async (actionId, approvalPayload) => {
     try {
       await fetch('http://localhost:8000/api/approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action_id: actionId }),
+        body: JSON.stringify({ action_id: actionId, payload: approvalPayload }),
       });
       setPendingEmail(null);
       setPendingForm(null);

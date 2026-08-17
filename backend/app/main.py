@@ -45,6 +45,7 @@ class GoalRequest(BaseModel):
 
 class ActionApprovalRequest(BaseModel):
     action_id: str
+    payload: Dict[str, Any] = None
 
 @app.on_event("startup")
 async def startup_event():
@@ -176,8 +177,8 @@ async def approve_action(req: ActionApprovalRequest):
         await push_stream_event("COMPLETED", "Email sent successfully to recipient!")
         return res
     elif "form" in req.action_id:
-        res = await form_tool.submit_form(req.action_id)
-        await push_stream_event("COMPLETED", "Form submitted successfully!")
+        res = await form_tool.submit_form(req.action_id, req.payload)
+        await push_stream_event("COMPLETED", "Form submitted successfully on Chrome!")
         return res
     
     return {"status": "UNKNOWN_ACTION"}

@@ -23,31 +23,41 @@ class FormTool:
         flagged_fields: List[Dict[str, Any]] = []
         uploaded_resume_path = None
 
-        # Check for resume upload file
-        resume_path = file_tool.get_best_resume_path()
+        # Check for resume upload files on machine
+        resume_files = file_tool.find_resume_files()
+        available_resume_paths = [r["path"] for r in resume_files]
 
+        # Check if user previously ingested/uploaded a resume
+        default_res_path = memory_engine.profile_data.get("documents", {}).get("active_resume_path")
+        if default_res_path and default_res_path not in available_resume_paths:
+            available_resume_paths.insert(0, default_res_path)
+
+        uploaded_resume_path = default_res_path or file_tool.get_best_resume_path()
+
+        file_added = False
         for inp in inputs:
             label = inp.get("labelText") or inp.get("name") or inp.get("id")
             inp_type = inp.get("type", "")
 
-            # File upload handling
+            # File upload handling (add only once)
             if inp_type == "file" or "resume" in label.lower() or "cv" in label.lower():
-                if resume_path:
-                    uploaded_resume_path = resume_path
-                    filled_fields.append({
-                        "field_label": label or "Resume Upload",
-                        "field_id": inp.get("id"),
-                        "value": f"[ATTACHED FILE] {resume_path}",
-                        "is_file": True,
-                        "file_path": resume_path
-                    })
-                else:
-                    flagged_fields.append({
-                        "field_label": label or "Resume Upload",
-                        "field_id": inp.get("id"),
-                        "reason": "No local resume found in ~/Downloads or ~/Documents",
-                        "is_file": True
-                    })
+                if not file_added:
+                    file_added = True
+                    if uploaded_resume_path:
+                        filled_fields.append({
+                            "field_label": label or "Resume Upload",
+                            "field_id": inp.get("id"),
+                            "value": f"[ATTACHED FILE] {uploaded_resume_path}",
+                            "is_file": True,
+                            "file_path": uploaded_resume_path
+                        })
+                    else:
+                        flagged_fields.append({
+                            "field_label": label or "Resume Upload",
+                            "field_id": inp.get("id"),
+                            "reason": "No local resume found. Ingest resume using Memory panel.",
+                            "is_file": True
+                        })
                 continue
 
             # Text / Standard inputs lookup
@@ -60,7 +70,9 @@ class FormTool:
                     "field_label": label,
                     "field_id": inp.get("id"),
                     "value": val,
-                    "is_file": False
+                    "is_file": False,
+                    "index": idx,
+                    "name": name_str
                 })
             else:
                 # Open ended answer generation via semantic memory fallback
@@ -74,7 +86,9 @@ class FormTool:
                         "field_label": label,
                         "field_id": inp.get("id"),
                         "value": gen_ans[:250],
-                        "is_ai_generated": True
+                        "is_ai_generated": True,
+                        "index": idx,
+                        "name": name_str
                     })
                 else:
                     flagged_fields.append({
@@ -89,7 +103,8 @@ class FormTool:
             "page_title": nav_result.get("title", "Form"),
             "filled_fields": filled_fields,
             "flagged_fields": flagged_fields,
-            "uploaded_resume": uploaded_resume_path
+            "uploaded_resume": uploaded_resume_path,
+            "available_resumes": available_resume_paths
         }
 
         # Step 3: Permission Gate for Form Submission
@@ -107,12 +122,21 @@ class FormTool:
         }
 
     @staticmethod
-    async def submit_form(action_id: str) -> Dict[str, Any]:
+    async def submit_form(action_id: str, approval_payload: Dict[str, Any] = None) -> Dict[str, Any]:
         approved = permission_engine.approve_action(action_id)
         if not approved:
             return {"status": "REJECTED", "message": "Form submission was not approved."}
 
         logger.info(f"Executing form submission for action {action_id}")
+        
+        # Apply updated fields edited by user in UI popup
+        if approval_payload and "updated_fields" in approval_payload:
+            for idx, f in enumerate(approval_payload["updated_fields"]):
+                if f.get("value"):
+                    f_idx = f.get("index", idx)
+                    f_name = f.get("name", "")
+                    await browser_tool.fill_input_by_index_or_name(f_idx, f_name, f["value"])
+
         submitted = await browser_tool.click_submit_button()
         return {
             "status": "SUBMITTED",

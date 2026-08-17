@@ -1,18 +1,24 @@
 {
   "personal": {
     "full_name": "Dev Mehta",
-    "email_primary": "dev@example.com",
+    "email_primary": "mehtadev2004@gmail.com",
     "email_secondary": "dev.work@example.com",
-    "phone": "+91-9876543210",
+    "phone": "+91-7206049507",
     "location": "Punjab, India",
     "work_authorization": "Authorized to work in India & US Remote"
   },
   "education": {
-    "university": "Thapar University",
-    "degree": "B.E. Computer Engineering",
+    "university": "\u2022 ELC Activities: Executed 5 projects at the university\u2019s Experiential Learning Centre, showcasing a practical",
+    "degree": "B.E. Computer Engineering, CGPA: 8.7",
     "graduation_year": "2026",
     "gpa": "3.8/4.0",
-    "coursework": ["Data Structures", "Algorithms", "Operating Systems", "Database Management Systems", "Distributed Systems"]
+    "coursework": [
+      "Data Structures",
+      "Algorithms",
+      "Operating Systems",
+      "Database Management Systems",
+      "Distributed Systems"
+    ]
   },
   "professional": {
     "current_role": "SDE Intern",
@@ -20,8 +26,18 @@
     "total_experience": "1 year (Internship + Projects)",
     "notice_period": "Immediate / 15 Days",
     "expected_salary": "Negotiable / Standard Industry Rate",
-    "skills": ["Python", "FastAPI", "JavaScript", "React", "Playwright", "PostgreSQL", "System Design", "Docker", "Git"],
-    "experience_summary": "SDE Intern at Amazon working on backend distributed systems, REST APIs, and microservices architecture. Strong problem-solving background in data structures and algorithm design."
+    "skills": [
+      "Python",
+      "FastAPI",
+      "JavaScript",
+      "React",
+      "Playwright",
+      "PostgreSQL",
+      "System Design",
+      "Docker",
+      "Git"
+    ],
+    "experience_summary": "Dev Mehta +91-7206049507 | mehtadev2004@gmail.com | linkedin.com/in/DevMehta | github.com/Dev22mehta17 Education Thapar Institute Of Engineering and Technology, Patiala August 2022 - July 2026 B.E. Computer Engineering, CGPA: 8.7 Sky Hawk International School, Delhi April 2021 - March 2022 12th Non Medical, CBSE, Percentage: 93.60 Vaish Model Sr. Sec. School, Bhiwani April 2019 - March 2020 10th C"
   },
   "links": {
     "github": "https://github.com/devmehta",
