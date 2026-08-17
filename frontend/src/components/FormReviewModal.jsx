@@ -6,6 +6,8 @@ export default function FormReviewModal({ formData, onApprove, onReject }) {
 
   const { form_url, page_title, filled_fields, flagged_fields, action_id, uploaded_resume, available_resumes } = formData;
 
+  const [fields, setFields] = useState([]);
+  const [selectedResume, setSelectedResume] = useState(uploaded_resume || '');
   const [resumeList, setResumeList] = useState([]);
   const [customUploadMsg, setCustomUploadMsg] = useState('');
 
