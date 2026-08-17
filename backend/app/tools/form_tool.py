@@ -137,6 +137,12 @@ class FormTool:
                     f_name = f.get("name", "")
                     await browser_tool.fill_input_by_index_or_name(f_idx, f_name, f["value"])
 
+        # Upload selected resume to Google Form file input if required
+        selected_res = approval_payload.get("selected_resume") if approval_payload else None
+        if selected_res:
+            logger.info(f"Uploading selected resume file: {selected_res}")
+            await browser_tool.upload_file_to_google_form(selected_res)
+
         submitted = await browser_tool.click_submit_button()
         return {
             "status": "SUBMITTED",

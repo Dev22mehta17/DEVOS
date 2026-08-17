@@ -210,14 +210,48 @@ class BrowserTool:
             logger.error(f"Error filling input {selector}: {e}")
             return False
 
-    async def upload_file(self, selector: str, file_path: str) -> bool:
-        if not self.page:
+    async def upload_file_to_google_form(self, file_path: str) -> bool:
+        """Uploads a local file to a Google Form file upload input."""
+        if not self.page or not file_path or not os.path.exists(file_path):
+            logger.warning(f"File path invalid or missing: {file_path}")
             return False
         try:
-            await self.page.set_input_files(selector, file_path)
-            return True
+            logger.info(f"Attempting file upload to Google Form: {file_path}")
+
+            # 1. Look for existing input[type="file"]
+            file_inputs = await self.page.query_selector_all('input[type="file"]')
+            if file_inputs:
+                for f_inp in file_inputs:
+                    try:
+                        await f_inp.set_input_files(file_path)
+                        logger.info("Uploaded file via input[type='file'].")
+                        await asyncio.sleep(1.5)
+                        return True
+                    except Exception as e:
+                        logger.debug(f"Direct file input set failed: {e}")
+
+            # 2. Click "Add file" button and handle FileChooser
+            add_btn = await self.page.query_selector('div[role="button"][aria-label*="Add file"], div[role="button"]:has-text("Add file"), span:has-text("Add file"), span:has-text("Add File")')
+            if add_btn:
+                try:
+                    async with self.page.expect_file_chooser(timeout=5000) as fc_info:
+                        await add_btn.click()
+                    file_chooser = await fc_info.value
+                    await file_chooser.set_files(file_path)
+                    logger.info("Uploaded file via FileChooser.")
+                    await asyncio.sleep(2.0)
+
+                    upload_submit = await self.page.query_selector('div[role="button"]:has-text("Upload"), span:has-text("Upload")')
+                    if upload_submit:
+                        await upload_submit.click()
+                        await asyncio.sleep(3.0)
+                    return True
+                except Exception as e:
+                    logger.error(f"FileChooser error: {e}")
+
+            return False
         except Exception as e:
-            logger.error(f"Error uploading file {file_path} to {selector}: {e}")
+            logger.error(f"Error uploading file to Google Form: {e}")
             return False
 
     async def close(self):

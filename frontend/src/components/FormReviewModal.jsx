@@ -6,8 +6,8 @@ export default function FormReviewModal({ formData, onApprove, onReject }) {
 
   const { form_url, page_title, filled_fields, flagged_fields, action_id, uploaded_resume, available_resumes } = formData;
 
-  const [fields, setFields] = useState([]);
-  const [selectedResume, setSelectedResume] = useState(uploaded_resume || '');
+  const [resumeList, setResumeList] = useState([]);
+  const [customUploadMsg, setCustomUploadMsg] = useState('');
 
   useEffect(() => {
     if (filled_fields) {
@@ -15,7 +15,7 @@ export default function FormReviewModal({ formData, onApprove, onReject }) {
       const unique = [];
       const seen = new Set();
       filled_fields.forEach(f => {
-        if (f.is_file) return; // Handle resume separately in dropdown
+        if (f.is_file) return;
         if (!seen.has(f.field_label)) {
           seen.add(f.field_label);
           unique.push({ ...f });
@@ -23,10 +23,45 @@ export default function FormReviewModal({ formData, onApprove, onReject }) {
       });
       setFields(unique);
     }
-    if (uploaded_resume) {
+
+    const available = available_resumes && available_resumes.length > 0
+      ? [...available_resumes]
+      : (uploaded_resume ? [uploaded_resume] : []);
+
+    setResumeList(available);
+    if (uploaded_resume && !selectedResume) {
       setSelectedResume(uploaded_resume);
+    } else if (available.length > 0 && !selectedResume) {
+      setSelectedResume(available[0]);
     }
   }, [formData]);
+
+  const handleCustomUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setCustomUploadMsg(`Uploading '${file.name}'...`);
+    const formDataObj = new FormData();
+    formDataObj.append('file', file);
+
+    try {
+      const res = await fetch('http://localhost:8000/api/memory/upload', {
+        method: 'POST',
+        body: formDataObj
+      });
+      const result = await res.json();
+      if (result.status === 'SUCCESS') {
+        const filePath = result.filename;
+        setResumeList(prev => [filePath, ...prev]);
+        setSelectedResume(filePath);
+        setCustomUploadMsg(`✓ Attached '${file.name}'!`);
+        setTimeout(() => setCustomUploadMsg(''), 4000);
+      }
+    } catch (err) {
+      console.error('Upload error:', err);
+      setCustomUploadMsg('Upload failed.');
+    }
+  };
 
   const handleFieldChange = (index, newValue) => {
     const updated = [...fields];
@@ -41,10 +76,6 @@ export default function FormReviewModal({ formData, onApprove, onReject }) {
     });
   };
 
-  const resumeList = available_resumes && available_resumes.length > 0
-    ? available_resumes
-    : (uploaded_resume ? [uploaded_resume] : []);
-
   return (
     <div className="modal-overlay">
       <div className="glass-panel modal-card" style={{ maxWidth: '750px' }}>
@@ -56,12 +87,26 @@ export default function FormReviewModal({ formData, onApprove, onReject }) {
           </div>
         </div>
 
-        {/* Resume Selection Dropdown */}
-        <div style={{ background: 'rgba(0, 242, 254, 0.08)', border: '1px solid var(--accent-cyan)', padding: '0.8rem 1rem', borderRadius: '10px', marginBottom: '1.2rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.88rem', fontWeight: 600, color: 'var(--accent-cyan)', marginBottom: '0.4rem' }}>
-            <Paperclip size={18} />
-            <span>Select Resume File to Attach:</span>
+        {/* Resume Selection Dropdown & Custom Upload */}
+        <div style={{ background: 'rgba(0, 242, 254, 0.08)', border: '1px solid var(--accent-cyan)', padding: '0.86rem 1rem', borderRadius: '10px', marginBottom: '1.2rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.88rem', fontWeight: 600, color: 'var(--accent-cyan)' }}>
+              <Paperclip size={18} />
+              <span>Select Resume File to Attach:</span>
+            </div>
+            <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-purple)', fontSize: '0.82rem', fontWeight: 600, background: 'rgba(127,0,255,0.15)', padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--accent-purple)' }}>
+              <FileUp size={14} />
+              <span>+ Upload New Resume</span>
+              <input type="file" accept=".pdf,.docx,.doc" onChange={handleCustomUpload} style={{ display: 'none' }} />
+            </label>
           </div>
+
+          {customUploadMsg && (
+            <div style={{ fontSize: '0.78rem', color: 'var(--accent-emerald)', marginBottom: '0.4rem', fontWeight: 500 }}>
+              {customUploadMsg}
+            </div>
+          )}
+
           {resumeList.length > 0 ? (
             <select
               value={selectedResume}
@@ -86,7 +131,7 @@ export default function FormReviewModal({ formData, onApprove, onReject }) {
             </select>
           ) : (
             <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-              No local resume detected. Ingest your resume using the Memory panel on the right.
+              No local resume detected. Click '+ Upload New Resume' above to attach your file.
             </div>
           )}
         </div>
