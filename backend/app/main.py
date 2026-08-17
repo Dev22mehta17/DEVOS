@@ -97,19 +97,16 @@ async def upload_document_memory(file: UploadFile = File(...)):
     """Uploads a PDF/TXT resume or doc, extracts text context, and saves to memory."""
     try:
         content = await file.read()
-        text = ""
-        if file.filename.lower().endswith(".pdf"):
-            import io
-            from pypdf import PdfReader
-            pdf = PdfReader(io.BytesIO(content))
-            for page in pdf.pages:
-                text += (page.extract_text() or "") + "\n"
-        else:
-            text = content.decode("utf-8", errors="ignore")
+        upload_dir = Path(__file__).parent.parent / "uploads"
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        saved_file = upload_dir / file.filename
+        with open(saved_file, "wb") as f:
+            f.write(content)
 
-        memory_engine.add_document_context(text, file.filename)
+        full_path = str(saved_file.resolve())
+        memory_engine.add_document_context(text, full_path)
         await push_stream_event("MEMORY_QUERY", f"Ingested context from '{file.filename}' ({len(text)} chars) into vector memory.")
-        return {"status": "SUCCESS", "filename": file.filename, "extracted_chars": len(text), "data": memory_engine.profile_data}
+        return {"status": "SUCCESS", "filename": full_path, "extracted_chars": len(text), "data": memory_engine.profile_data}
     except Exception as e:
         logger.error(f"Upload error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to process file: {str(e)}")
@@ -173,8 +170,8 @@ async def approve_action(req: ActionApprovalRequest):
     await push_stream_event("THINKING", f"User approved action {req.action_id}. Proceeding to final execution...")
     
     if "email" in req.action_id:
-        res = await gmail_tool.send_draft(req.action_id)
-        await push_stream_event("COMPLETED", "Email sent successfully to recipient!")
+        res = await gmail_tool.send_draft(req.action_id, req.payload)
+        await push_stream_event("COMPLETED", "Email created and sent live on Gmail!")
         return res
     elif "form" in req.action_id:
         res = await form_tool.submit_form(req.action_id, req.payload)
