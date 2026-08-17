@@ -91,12 +91,26 @@ async def update_memory(data: Dict[str, Any]):
     return {"status": "SUCCESS", "data": memory_engine.profile_data}
 
 from fastapi import UploadFile, File
+from pathlib import Path
 
 @app.post("/api/memory/upload")
 async def upload_document_memory(file: UploadFile = File(...)):
-    """Uploads a PDF/TXT resume or doc, extracts text context, and saves to memory."""
+    """Uploads a PDF/TXT resume or doc, extracts text, saves file to disk, and ingests into memory."""
     try:
         content = await file.read()
+
+        # Extract text from PDF or plain text
+        text = ""
+        if file.filename.lower().endswith(".pdf"):
+            import io
+            from pypdf import PdfReader
+            pdf = PdfReader(io.BytesIO(content))
+            for page in pdf.pages:
+                text += (page.extract_text() or "") + "\n"
+        else:
+            text = content.decode("utf-8", errors="ignore")
+
+        # Save file to disk so Playwright can upload it later
         upload_dir = Path(__file__).parent.parent / "uploads"
         upload_dir.mkdir(parents=True, exist_ok=True)
         saved_file = upload_dir / file.filename
@@ -171,11 +185,18 @@ async def approve_action(req: ActionApprovalRequest):
     
     if "email" in req.action_id:
         res = await gmail_tool.send_draft(req.action_id, req.payload)
-        await push_stream_event("COMPLETED", "Email created and sent live on Gmail!")
+        if res.get("sent_on_chrome"):
+            await push_stream_event("COMPLETED", f"✅ Email sent live on Gmail! {res.get('message', '')}")
+        else:
+            await push_stream_event("COMPLETED", f"⚠️ Email send issue: {res.get('message', 'Unknown error')}")
         return res
     elif "form" in req.action_id:
         res = await form_tool.submit_form(req.action_id, req.payload)
-        await push_stream_event("COMPLETED", "Form submitted successfully on Chrome!")
+        if res.get("submitted_on_chrome"):
+            verified = "✅ Verified!" if res.get("verified") else "(click verification pending)"
+            await push_stream_event("COMPLETED", f"Form submitted on Chrome! {verified}")
+        else:
+            await push_stream_event("COMPLETED", f"⚠️ Form submit issue: {res.get('message', 'Submit button not found')}")
         return res
     
     return {"status": "UNKNOWN_ACTION"}
