@@ -82,58 +82,66 @@ class BrowserTool:
         if not self.page:
             return []
         try:
+            # Wait for Google Forms DOM elements to finish rendering
+            try:
+                await self.page.wait_for_selector('input[type="text"], textarea, div[role="heading"]', timeout=8000)
+            except Exception:
+                pass
+
             inputs_data = await self.page.evaluate("""() => {
-                // 1. Google Forms specialized items inspection
-                const googleFormItems = Array.from(document.querySelectorAll('div[role="listitem"], div[jsmodel]'));
-                if (googleFormItems.length > 0) {
-                    const results = [];
-                    googleFormItems.forEach((container, idx) => {
-                        const heading = container.querySelector('div[role="heading"], .M7eMe, span');
-                        const labelText = heading ? heading.innerText : '';
-                        const input = container.querySelector('input[type="text"], input[type="email"], input[type="tel"], textarea');
-                        if (input) {
-                            results.push({
-                                id: input.id || `gform_input_${idx}`,
-                                name: input.name || '',
-                                type: input.type || 'text',
-                                tagName: input.tagName.toLowerCase(),
-                                placeholder: input.placeholder || '',
-                                labelText: (labelText || '').trim().split('\\n')[0],
-                                value: input.value || '',
-                                required: container.innerText.includes('*'),
-                                index: idx
-                            });
-                        }
-                    });
-                    if (results.length > 0) return results;
-                }
+                const results = [];
 
-                // 2. Standard HTML inputs fallback
-                const elements = Array.from(document.querySelectorAll('input, textarea, select'));
-                return elements.map((el, idx) => {
-                    let labelText = '';
-                    if (el.id) {
-                        const lbl = document.querySelector(`label[for="${el.id}"]`);
-                        if (lbl) labelText = lbl.innerText;
+                // 1. Query all text/email/tel inputs and textareas
+                const inputs = Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"], textarea'));
+                inputs.forEach((inp, idx) => {
+                    let container = inp.closest('div[role="listitem"]') || inp.closest('div[jsmodel]') || inp.closest('div[jscontroller]') || inp.parentElement?.parentElement;
+                    let headingText = '';
+                    if (container) {
+                        const headingEl = container.querySelector('div[role="heading"], .M7eMe, span');
+                        if (headingEl) headingText = headingEl.innerText;
                     }
-                    if (!labelText && el.closest('label')) labelText = el.closest('label').innerText;
-                    if (!labelText && el.closest('div')) labelText = el.closest('div').innerText;
-                    if (!labelText && el.placeholder) labelText = el.placeholder;
-                    if (!labelText && el.name) labelText = el.name;
-                    if (!labelText && el.getAttribute('aria-label')) labelText = el.getAttribute('aria-label');
+                    if (!headingText && inp.getAttribute('aria-label')) {
+                        headingText = inp.getAttribute('aria-label');
+                    }
+                    if (!headingText && inp.placeholder) {
+                        headingText = inp.placeholder;
+                    }
 
-                    return {
-                        id: el.id || `input_${idx}`,
-                        name: el.name || '',
-                        type: el.type || el.tagName.toLowerCase(),
-                        tagName: el.tagName.toLowerCase(),
-                        placeholder: el.placeholder || '',
-                        labelText: (labelText || '').trim().split('\\n')[0],
-                        value: el.value || '',
-                        required: el.required || false,
+                    results.push({
+                        id: inp.id || `input_${idx}`,
+                        name: inp.name || '',
+                        type: inp.type || 'text',
+                        tagName: inp.tagName.toLowerCase(),
+                        placeholder: inp.placeholder || '',
+                        labelText: (headingText || '').trim().split('\\n')[0],
+                        value: inp.value || '',
+                        required: container ? container.innerText.includes('*') : false,
                         index: idx
-                    };
+                    });
                 });
+
+                // 2. Check for File Upload ("Add file") Google Form blocks
+                const fileAddBtns = Array.from(document.querySelectorAll('div[role="button"], span'))
+                    .filter(el => el.innerText && el.innerText.trim().toLowerCase().includes('add file'));
+                fileAddBtns.forEach((btn, idx) => {
+                    let container = btn.closest('div[role="listitem"]') || btn.closest('div[jsmodel]') || btn.parentElement?.parentElement;
+                    let headingText = 'Resume / File Upload';
+                    if (container) {
+                        const headingEl = container.querySelector('div[role="heading"], .M7eMe');
+                        if (headingEl) headingText = headingEl.innerText;
+                    }
+                    results.push({
+                        id: `file_btn_${idx}`,
+                        name: 'file_upload',
+                        type: 'file',
+                        tagName: 'button',
+                        labelText: headingText.trim().split('\\n')[0],
+                        required: container ? container.innerText.includes('*') : true,
+                        index: results.length
+                    });
+                });
+
+                return results;
             }""")
             return inputs_data
         except Exception as e:

@@ -68,8 +68,9 @@ class MemoryEngine:
             logger.error(f"Error seeding ChromaDB: {e}")
 
     def add_document_context(self, text: str, filename: str) -> bool:
-        """Ingests extracted text from uploaded PDF/Doc into vector memory."""
+        """Ingests text from uploaded PDF/Doc into vector memory and auto-extracts profile details."""
         try:
+            import re
             if self.collection and text.strip():
                 # Split text into chunks of 300 words
                 words = text.split()
@@ -78,11 +79,40 @@ class MemoryEngine:
                 self.collection.upsert(documents=chunks, ids=ids)
                 logger.info(f"Ingested {len(chunks)} text chunks from document {filename} into ChromaDB.")
 
-            # Also update experience summary in profile
-            summary = text[:300].replace("\n", " ").strip()
-            if "professional" in self.profile_data:
-                self.profile_data["professional"]["experience_summary"] = summary
-                self.save_profile(self.profile_data)
+            # Auto-extract structured profile fields from text
+            email_match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', text)
+            phone_match = re.search(r'\+?\d[\d\s\-]{8,}\d', text)
+            linkedin_match = re.search(r'https?://[w\.]*linkedin\.com/in/[\w\-]+', text)
+            github_match = re.search(r'https?://[w\.]*github\.com/[\w\-]+', text)
+
+            lines = [line.strip() for line in text.split('\n') if line.strip()]
+            
+            if "personal" not in self.profile_data: self.profile_data["personal"] = {}
+            if "education" not in self.profile_data: self.profile_data["education"] = {}
+            if "links" not in self.profile_data: self.profile_data["links"] = {}
+            if "professional" not in self.profile_data: self.profile_data["professional"] = {}
+
+            if email_match:
+                self.profile_data["personal"]["email_primary"] = email_match.group(0)
+            if phone_match:
+                self.profile_data["personal"]["phone"] = phone_match.group(0).strip()
+            if linkedin_match:
+                self.profile_data["links"]["linkedin"] = linkedin_match.group(0)
+            if github_match:
+                self.profile_data["links"]["github"] = github_match.group(0)
+
+            if lines and len(lines[0]) < 40 and not any(c in lines[0] for c in ['@', 'http', ':']):
+                self.profile_data["personal"]["full_name"] = lines[0]
+
+            for line in lines:
+                l_lower = line.lower()
+                if any(u in l_lower for u in ["university", "college", "institute", "thapar"]):
+                    self.profile_data["education"]["university"] = line
+                if any(d in l_lower for d in ["b.e.", "b.tech", "bachelor", "degree", "computer engineering", "computer science"]):
+                    self.profile_data["education"]["degree"] = line
+
+            self.profile_data["professional"]["experience_summary"] = text[:400].replace("\n", " ").strip()
+            self.save_profile(self.profile_data)
 
             return True
         except Exception as e:
