@@ -211,47 +211,142 @@ class BrowserTool:
             return False
 
     async def upload_file_to_google_form(self, file_path: str) -> bool:
-        """Uploads a local file to a Google Form file upload input."""
+        """Uploads a local file to a Google Form file upload field.
+        
+        Google Forms file upload works as follows:
+        1. Click 'Add file' button on the form
+        2. A Google Drive popup window opens with tabs: Upload, My Drive, Recent
+        3. Under Upload tab, click 'Browse' button → triggers native OS file chooser
+        4. Select file → upload starts
+        5. Click 'Upload' to confirm
+        """
         if not self.page or not file_path or not os.path.exists(file_path):
-            logger.warning(f"File path invalid or missing: {file_path}")
+            logger.warning(f"[Upload] File path invalid or missing: {file_path}")
             return False
-        try:
-            logger.info(f"Attempting file upload to Google Form: {file_path}")
 
-            # 1. Look for existing input[type="file"]
+        try:
+            logger.info(f"[Upload] Starting Google Form file upload: {file_path}")
+
+            # Method 1: Try direct input[type="file"] (works on standard HTML forms)
             file_inputs = await self.page.query_selector_all('input[type="file"]')
             if file_inputs:
                 for f_inp in file_inputs:
                     try:
                         await f_inp.set_input_files(file_path)
-                        logger.info("Uploaded file via input[type='file'].")
-                        await asyncio.sleep(1.5)
+                        logger.info("[Upload] ✅ Uploaded via input[type='file']")
+                        await asyncio.sleep(2.0)
                         return True
                     except Exception as e:
-                        logger.debug(f"Direct file input set failed: {e}")
+                        logger.debug(f"[Upload] Direct file input failed: {e}")
 
-            # 2. Click "Add file" button and handle FileChooser
-            add_btn = await self.page.query_selector('div[role="button"][aria-label*="Add file"], div[role="button"]:has-text("Add file"), span:has-text("Add file"), span:has-text("Add File")')
-            if add_btn:
+            # Method 2: Google Forms — click 'Add file' which opens a Google Drive popup
+            add_btn = await self.page.query_selector(
+                'div[role="button"][aria-label*="Add file"], '
+                'div[role="button"]:has-text("Add file"), '
+                'span:has-text("Add file"), '
+                'span:has-text("Add File")'
+            )
+            
+            if not add_btn:
+                logger.warning("[Upload] Could not find 'Add file' button")
+                return False
+
+            logger.info("[Upload] Found 'Add file' button, clicking...")
+
+            # Google Forms opens a popup window when 'Add file' is clicked
+            try:
+                # Listen for the popup window
+                async with self.page.expect_popup(timeout=10000) as popup_info:
+                    await add_btn.click()
+                popup_page = await popup_info.value
+                logger.info(f"[Upload] Google Drive popup opened: {popup_page.url}")
+
+                # Wait for popup to load
+                await asyncio.sleep(3.0)
+
+                # The popup has tabs: Upload, My Drive, Recent
+                # Make sure we're on the Upload tab
                 try:
-                    async with self.page.expect_file_chooser(timeout=5000) as fc_info:
+                    upload_tab = await popup_page.query_selector('div[role="tab"]:has-text("Upload"), span:has-text("Upload")')
+                    if upload_tab:
+                        await upload_tab.click()
+                        await asyncio.sleep(1.0)
+                        logger.info("[Upload] Clicked 'Upload' tab in popup")
+                except Exception:
+                    pass
+
+                # Click 'Browse' button which triggers native file chooser
+                browse_btn = await popup_page.query_selector(
+                    'button:has-text("Browse"), '
+                    'div[role="button"]:has-text("Browse"), '
+                    'span:has-text("Browse")'
+                )
+
+                if browse_btn:
+                    # Handle native file chooser triggered by Browse click
+                    async with popup_page.expect_file_chooser(timeout=10000) as fc_info:
+                        await browse_btn.click()
+                    file_chooser = await fc_info.value
+                    await file_chooser.set_files(file_path)
+                    logger.info(f"[Upload] ✅ File selected via Browse: {file_path}")
+
+                    # Wait for upload to complete (Google shows a progress bar)
+                    await asyncio.sleep(8.0)
+
+                    # Click 'Upload' button to confirm
+                    try:
+                        upload_confirm = await popup_page.query_selector(
+                            'button:has-text("Upload"), '
+                            '#upload-confirm, '
+                            'div[role="button"]:has-text("Upload")'
+                        )
+                        if upload_confirm:
+                            await upload_confirm.click()
+                            logger.info("[Upload] Clicked Upload confirm button")
+                            await asyncio.sleep(3.0)
+                    except Exception as e:
+                        logger.debug(f"[Upload] Upload confirm click issue: {e}")
+
+                    # Popup should auto-close after upload
+                    try:
+                        if not popup_page.is_closed():
+                            await popup_page.close()
+                    except Exception:
+                        pass
+
+                    logger.info("[Upload] ✅ File upload completed successfully")
+                    return True
+                else:
+                    logger.warning("[Upload] Could not find Browse button in popup")
+                    # Fallback: try drag-drop area or direct file chooser in popup
+                    try:
+                        popup_file_input = await popup_page.query_selector('input[type="file"]')
+                        if popup_file_input:
+                            await popup_file_input.set_input_files(file_path)
+                            logger.info("[Upload] ✅ Uploaded via popup's input[type=file]")
+                            await asyncio.sleep(5.0)
+                            return True
+                    except Exception:
+                        pass
+
+            except Exception as popup_err:
+                logger.warning(f"[Upload] Popup method failed: {popup_err}")
+
+                # Method 3: Fallback — try file chooser directly on main page
+                try:
+                    async with self.page.expect_file_chooser(timeout=8000) as fc_info:
                         await add_btn.click()
                     file_chooser = await fc_info.value
                     await file_chooser.set_files(file_path)
-                    logger.info("Uploaded file via FileChooser.")
-                    await asyncio.sleep(2.0)
-
-                    upload_submit = await self.page.query_selector('div[role="button"]:has-text("Upload"), span:has-text("Upload")')
-                    if upload_submit:
-                        await upload_submit.click()
-                        await asyncio.sleep(3.0)
+                    logger.info("[Upload] ✅ Uploaded via direct file chooser fallback")
+                    await asyncio.sleep(3.0)
                     return True
-                except Exception as e:
-                    logger.error(f"FileChooser error: {e}")
+                except Exception as fc_err:
+                    logger.error(f"[Upload] Direct file chooser fallback also failed: {fc_err}")
 
             return False
         except Exception as e:
-            logger.error(f"Error uploading file to Google Form: {e}")
+            logger.error(f"[Upload] Fatal error: {e}")
             return False
 
     async def close(self):

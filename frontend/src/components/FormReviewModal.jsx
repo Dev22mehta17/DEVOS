@@ -73,6 +73,7 @@ export default function FormReviewModal({ formData, onApprove, onReject }) {
 
   const handleApproveSubmit = () => {
     onApprove(action_id, {
+      form_url: form_url,
       updated_fields: fields,
       selected_resume: selectedResume
     });

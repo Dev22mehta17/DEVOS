@@ -1,6 +1,6 @@
 import logging
 from enum import Enum
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,8 @@ class ActionPolicy:
 
 class PermissionEngine:
     def __init__(self):
-        self.pending_approval: Optional[Dict[str, Any]] = None
+        # Support MULTIPLE pending approvals keyed by action_id
+        self.pending_approvals: Dict[str, Dict[str, Any]] = {}
         self.approved_actions: set = set()
 
     def check_action(self, action_id: str, action_type: str, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -51,28 +52,34 @@ class PermissionEngine:
                 "action_id": action_id
             }
 
-        # Stage action for approval
-        self.pending_approval = {
+        # Stage action for approval (supports multiple concurrent actions)
+        pending = {
             "action_id": action_id,
             "action_type": action_type,
             "risk_level": risk_level,
             "payload": payload,
             "status": "PENDING_APPROVAL"
         }
+        self.pending_approvals[action_id] = pending
         logger.info(f"Action {action_type} ({action_id}) paused for HITL approval.")
-        return self.pending_approval
+        return pending
 
     def approve_action(self, action_id: str) -> bool:
-        if self.pending_approval and self.pending_approval["action_id"] == action_id:
+        if action_id in self.pending_approvals:
             self.approved_actions.add(action_id)
-            self.pending_approval = None
+            del self.pending_approvals[action_id]
             logger.info(f"Action {action_id} explicitly approved by user.")
             return True
+        # Also allow if already approved (idempotent)
+        if action_id in self.approved_actions:
+            logger.info(f"Action {action_id} was already approved (idempotent).")
+            return True
+        logger.warning(f"Action {action_id} not found in pending approvals.")
         return False
 
     def reject_action(self, action_id: str) -> bool:
-        if self.pending_approval and self.pending_approval["action_id"] == action_id:
-            self.pending_approval = None
+        if action_id in self.pending_approvals:
+            del self.pending_approvals[action_id]
             logger.info(f"Action {action_id} rejected by user.")
             return True
         return False
