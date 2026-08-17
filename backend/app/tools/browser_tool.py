@@ -78,11 +78,37 @@ class BrowserTool:
         return {"title": title, "url": url}
 
     async def inspect_inputs(self) -> List[Dict[str, Any]]:
-        """Scans DOM for form input fields, textareas, selects, and file pickers."""
+        """Scans DOM for form input fields, textareas, selects, and file pickers, specialized for Google Forms."""
         if not self.page:
             return []
         try:
             inputs_data = await self.page.evaluate("""() => {
+                // 1. Google Forms specialized items inspection
+                const googleFormItems = Array.from(document.querySelectorAll('div[role="listitem"], div[jsmodel]'));
+                if (googleFormItems.length > 0) {
+                    const results = [];
+                    googleFormItems.forEach((container, idx) => {
+                        const heading = container.querySelector('div[role="heading"], .M7eMe, span');
+                        const labelText = heading ? heading.innerText : '';
+                        const input = container.querySelector('input[type="text"], input[type="email"], input[type="tel"], textarea');
+                        if (input) {
+                            results.push({
+                                id: input.id || `gform_input_${idx}`,
+                                name: input.name || '',
+                                type: input.type || 'text',
+                                tagName: input.tagName.toLowerCase(),
+                                placeholder: input.placeholder || '',
+                                labelText: (labelText || '').trim().split('\\n')[0],
+                                value: input.value || '',
+                                required: container.innerText.includes('*'),
+                                index: idx
+                            });
+                        }
+                    });
+                    if (results.length > 0) return results;
+                }
+
+                // 2. Standard HTML inputs fallback
                 const elements = Array.from(document.querySelectorAll('input, textarea, select'));
                 return elements.map((el, idx) => {
                     let labelText = '';
@@ -90,27 +116,22 @@ class BrowserTool:
                         const lbl = document.querySelector(`label[for="${el.id}"]`);
                         if (lbl) labelText = lbl.innerText;
                     }
-                    if (!labelText && el.closest('label')) {
-                        labelText = el.closest('label').innerText;
-                    }
-                    if (!labelText && el.placeholder) {
-                        labelText = el.placeholder;
-                    }
-                    if (!labelText && el.name) {
-                        labelText = el.name;
-                    }
-                    if (!labelText && el.getAttribute('aria-label')) {
-                        labelText = el.getAttribute('aria-label');
-                    }
+                    if (!labelText && el.closest('label')) labelText = el.closest('label').innerText;
+                    if (!labelText && el.closest('div')) labelText = el.closest('div').innerText;
+                    if (!labelText && el.placeholder) labelText = el.placeholder;
+                    if (!labelText && el.name) labelText = el.name;
+                    if (!labelText && el.getAttribute('aria-label')) labelText = el.getAttribute('aria-label');
+
                     return {
                         id: el.id || `input_${idx}`,
                         name: el.name || '',
                         type: el.type || el.tagName.toLowerCase(),
                         tagName: el.tagName.toLowerCase(),
                         placeholder: el.placeholder || '',
-                        labelText: (labelText || '').trim(),
+                        labelText: (labelText || '').trim().split('\\n')[0],
                         value: el.value || '',
-                        required: el.required || false
+                        required: el.required || false,
+                        index: idx
                     };
                 });
             }""")
@@ -118,6 +139,58 @@ class BrowserTool:
         except Exception as e:
             logger.error(f"Error inspecting form inputs: {e}")
             return []
+
+    async def fill_input_by_index_or_name(self, idx: int, name: str, val: str) -> bool:
+        """Fills input element directly on page and triggers DOM input/change events."""
+        if not self.page:
+            return False
+        try:
+            success = await self.page.evaluate("""([idx, nameStr, valStr]) => {
+                let input = null;
+                if (nameStr) {
+                    input = document.querySelector(`input[name="${nameStr}"], textarea[name="${nameStr}"]`);
+                }
+                if (!input) {
+                    const all = Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"], textarea'));
+                    input = all[idx];
+                }
+                if (input) {
+                    input.focus();
+                    input.value = valStr;
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                    input.blur();
+                    return true;
+                }
+                return false;
+            }""", [idx, name, val])
+            return success
+        except Exception as e:
+            logger.error(f"Error filling input idx {idx}: {e}")
+            return False
+
+    async def click_submit_button(self) -> bool:
+        """Clicks the Submit button on Google Form or standard HTML form."""
+        if not self.page:
+            return False
+        try:
+            clicked = await self.page.evaluate("""() => {
+                const btn = Array.from(document.querySelectorAll('div[role="button"], span, button, input[type="submit"]'))
+                    .find(el => el.innerText && el.innerText.trim().toLowerCase() === 'submit');
+                if (btn) {
+                    btn.click();
+                    return true;
+                }
+                return false;
+            }""")
+            if clicked:
+                logger.info("Clicked Submit button on Chrome page.")
+                await asyncio.sleep(2.0)
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Error clicking submit button: {e}")
+            return False
 
     async def fill_input(self, selector: str, value: str) -> bool:
         if not self.page:

@@ -153,7 +153,9 @@ async def execute_goal(req: GoalRequest):
         await push_stream_event("FILE_SEARCH", "Scanning ~/Downloads & ~/Documents for resume PDF...")
         
         form_res = await form_tool.process_form(url)
-        await push_stream_event("APPROVAL_REQUIRED", "Form review sheet generated. Awaiting user submission approval.", form_res["payload"])
+        filled_count = len(form_res["payload"].get("filled_fields", []))
+        await push_stream_event("DOM_ACTION", f"Auto-filled {filled_count} fields directly on open Chrome page (Name, Email, Mobile, Education).")
+        await push_stream_event("APPROVAL_REQUIRED", f"Form review sheet generated ({filled_count} fields populated). Click Approve & Submit to submit on Chrome.", form_res["payload"])
         return form_res
 
     # Workflow 3: Real Web Search & Research

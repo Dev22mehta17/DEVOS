@@ -53,6 +53,9 @@ class FormTool:
             # Text / Standard inputs lookup
             val = memory_engine.get_field_value(label)
             if val:
+                idx = inp.get("index", 0)
+                name_str = inp.get("name", "")
+                await browser_tool.fill_input_by_index_or_name(idx, name_str, str(val))
                 filled_fields.append({
                     "field_label": label,
                     "field_id": inp.get("id"),
@@ -64,6 +67,9 @@ class FormTool:
                 if inp_type in ("textarea", "text") and any(k in label.lower() for k in ["why", "describe", "about", "project"]):
                     context_snippets = memory_engine.query_semantic_memory(label)
                     gen_ans = f"Based on my SDE intern experience at Amazon and degree at Thapar University: {' '.join(context_snippets[:2])}"
+                    idx = inp.get("index", 0)
+                    name_str = inp.get("name", "")
+                    await browser_tool.fill_input_by_index_or_name(idx, name_str, gen_ans[:250])
                     filled_fields.append({
                         "field_label": label,
                         "field_id": inp.get("id"),
@@ -107,10 +113,12 @@ class FormTool:
             return {"status": "REJECTED", "message": "Form submission was not approved."}
 
         logger.info(f"Executing form submission for action {action_id}")
+        submitted = await browser_tool.click_submit_button()
         return {
             "status": "SUBMITTED",
             "action_id": action_id,
-            "message": "Form submitted successfully."
+            "submitted_on_chrome": submitted,
+            "message": "Form submitted successfully on Chrome."
         }
 
 form_tool = FormTool()
