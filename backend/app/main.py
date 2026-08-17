@@ -143,8 +143,8 @@ async def execute_goal(req: GoalRequest):
         url_match = re.search(r'https?://[^\s]+', req.goal)
         url = url_match.group(0) if url_match else req.target_url
         
-        if not url or url == "https://forms.gle/sample":
-            await push_stream_event("APPROVAL_REQUIRED", "No target form URL provided. Please enter a valid Form URL (e.g. https://forms.gle/...) in prompt.")
+        if not url or url == "https://forms.gle/sample" or "<paste-form-url-here>" in url or "<url>" in url:
+            await push_stream_event("COMPLETED", "Form URL missing. Please include your target form link in prompt: e.g. 'Fill form at https://forms.gle/xyz'")
             return {"status": "URL_REQUIRED", "message": "Please provide a valid form URL in prompt."}
 
         await push_stream_event("DOM_ACTION", f"Navigating to web form: {url}")

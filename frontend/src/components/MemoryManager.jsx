@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Database, User, Briefcase, GraduationCap, Link as LinkIcon, Save } from 'lucide-react';
+import { Database, User, Briefcase, GraduationCap, Link as LinkIcon, Save, FileUp, CheckCircle } from 'lucide-react';
 
 export default function MemoryManager({ profile, onSave }) {
   const [memoryData, setMemoryData] = useState(profile || {});
   const [savedStatus, setSavedStatus] = useState('');
+  const [uploadStatus, setUploadStatus] = useState('');
 
   useEffect(() => {
     setMemoryData(profile || {});
@@ -17,6 +18,31 @@ export default function MemoryManager({ profile, onSave }) {
         [key]: value
       }
     }));
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadStatus(`Ingesting '${file.name}'...`);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch('http://localhost:8000/api/memory/upload', {
+        method: 'POST',
+        body: formData
+      });
+      const result = await res.json();
+      if (result.status === 'SUCCESS') {
+        setUploadStatus(`✓ Ingested ${result.extracted_chars} chars from '${file.name}'!`);
+        if (result.data) setMemoryData(result.data);
+        setTimeout(() => setUploadStatus(''), 4000);
+      }
+    } catch (err) {
+      console.error('File upload error:', err);
+      setUploadStatus('Upload failed.');
+    }
   };
 
   const handleSubmit = (e) => {
@@ -35,6 +61,20 @@ export default function MemoryManager({ profile, onSave }) {
         </div>
         {savedStatus && (
           <span style={{ fontSize: '0.8rem', color: 'var(--accent-emerald)', fontWeight: 600 }}>{savedStatus}</span>
+        )}
+      </div>
+
+      {/* Document Upload Button */}
+      <div style={{ background: 'rgba(127,0,255,0.08)', border: '1px dashed var(--accent-purple)', padding: '0.9rem', borderRadius: '10px', marginBottom: '1.2rem', textAlign: 'center' }}>
+        <label style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-purple)', fontWeight: 600, fontSize: '0.85rem' }}>
+          <FileUp size={20} />
+          <span>Ingest Resume / Doc to Context</span>
+          <input type="file" accept=".pdf,.txt,.doc,.docx" onChange={handleFileUpload} style={{ display: 'none' }} />
+        </label>
+        {uploadStatus && (
+          <div style={{ fontSize: '0.78rem', color: 'var(--accent-emerald)', marginTop: '0.4rem', fontWeight: 500 }}>
+            {uploadStatus}
+          </div>
         )}
       </div>
 

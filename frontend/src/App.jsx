@@ -59,6 +59,7 @@ export default function App() {
     if (!targetGoal.trim()) return;
 
     setIsProcessing(true);
+    setGoal(''); // Clear input box for next command
     setLogs((prev) => [
       ...prev,
       { step_type: 'THINKING', message: `User goal submitted: "${targetGoal}"` },
@@ -170,7 +171,7 @@ export default function App() {
             <div className="prompt-input-wrapper">
               <input
                 className="prompt-input"
-                placeholder="e.g. Open Mail and send an email to Rahul saying I'll be available tomorrow after 4 PM..."
+                placeholder="e.g. Open Mail and send an email to Dev on mehtadev2004@gmail.com..."
                 value={goal}
                 onChange={(e) => setGoal(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleExecute()}
@@ -189,32 +190,26 @@ export default function App() {
               <button
                 className="chip-btn"
                 onClick={() => {
-                  const g = "Send an email to Rahul saying I'll be available tomorrow after 4 PM";
-                  setGoal(g);
-                  handleExecute(g);
+                  setGoal("Send an email to mehtadev2004@gmail.com saying I'll be available tomorrow after 4 PM");
                 }}
               >
-                ✉️ Gmail: Send email to Rahul
+                ✉️ Gmail: Send Email to mehtadev2004@gmail.com
               </button>
               <button
                 className="chip-btn"
                 onClick={() => {
-                  const g = "Fill job application form with my profile and attach Dev_Resume.pdf";
-                  setGoal(g);
-                  handleExecute(g);
+                  setGoal("Fill job application form at https://<paste-form-url-here> with my profile and attach Dev_Resume.pdf");
                 }}
               >
-                📝 Form: Auto-fill Job Application
+                📝 Form: Auto-fill Job Application (Paste URL)
               </button>
               <button
                 className="chip-btn"
                 onClick={() => {
-                  const g = "Find 5 SDE-1 jobs matching my Amazon intern profile and rank them";
-                  setGoal(g);
-                  handleExecute(g);
+                  setGoal("Find 5 SDE-1 remote jobs matching my Amazon intern profile and rank them");
                 }}
               >
-                🔍 Research: Search SDE-1 Jobs
+                🔍 Research: Search SDE-1 Remote Jobs
               </button>
             </div>
           </div>
