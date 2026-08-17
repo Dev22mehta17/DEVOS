@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, CheckCircle, AlertTriangle, Send, X, Paperclip, FileCheck } from 'lucide-react';
+import { FileText, CheckCircle, AlertTriangle, Send, X, Paperclip, FileUp } from 'lucide-react';
 
 export default function FormReviewModal({ formData, onApprove, onReject }) {
   if (!formData) return null;
