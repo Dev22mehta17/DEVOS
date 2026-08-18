@@ -141,12 +141,34 @@ async def execute_goal(req: GoalRequest):
     goal_text = req.goal.lower()
     await push_stream_event("THINKING", f"Analyzing goal intent: '{req.goal}'")
     
-    # ─── 1. GMAIL AGENT WORKFLOWS ───
+    # ─── Priority 1: Direct Web URL / Form Application Workflow ───
+    # If the user provides ANY http/https URL, it is ALWAYS a web task / form fill (unless explicitly 'search google')
+    url_match = re.search(r'https?://[^\s\'"<>]+', req.goal)
+    target_url = url_match.group(0) if url_match else req.target_url
+
+    if target_url and not any(k in goal_text for k in ["search google for", "google search"]):
+        url = target_url.strip(".,'\"")
+        await push_stream_event("DOM_ACTION", f"Navigating to target portal: {url}")
+        await push_stream_event("DOM_ACTION", "Inspecting form controls, candidate fields, and file uploaders...")
+        await push_stream_event("MEMORY_QUERY", "Retrieving profile attributes, resume files, and custom notes...")
+
+        # If Google Form, use specialized Google Form tool
+        if "docs.google.com/forms" in url or "forms.gle" in url:
+            form_res = await form_tool.process_form(url)
+        else:
+            # Universal Web Workflow (Taleo, Greenhouse, Lever, Workday, Portals)
+            form_res = await universal_web_tool.execute_web_task(url, req.goal)
+
+        filled_count = len(form_res["payload"].get("filled_fields", []))
+        await push_stream_event("DOM_ACTION", f"Detected and populated {filled_count} fields directly on open Chrome page.")
+        await push_stream_event("APPROVAL_REQUIRED", f"Review sheet generated ({filled_count} fields). Review in modal and click Approve to submit.", form_res["payload"])
+        return form_res
+
+    # ─── Priority 2: Gmail Agent Workflows ───
     if any(k in goal_text for k in ["email", "mail", "gmail", "inbox", "recruiter", "hr"]):
         
-        # 1A. Reply Intent
+        # 2A. Reply Intent
         if any(k in goal_text for k in ["reply", "respond", "answer to"]):
-            # Extract target search query (e.g. "from Amazon HR", "recruiter", "interview")
             search_query = "recruiter"
             if "from" in goal_text:
                 search_query = req.goal.split("from")[-1].split("and")[0].strip()
@@ -160,7 +182,7 @@ async def execute_goal(req: GoalRequest):
             await push_stream_event("APPROVAL_REQUIRED", f"Reply draft staged for {reply_res['payload']['recipient']}. Review in modal.", reply_res["payload"])
             return reply_res
 
-        # 1B. Forward Intent
+        # 2B. Forward Intent
         elif any(k in goal_text for k in ["forward", "fwd"]):
             email_match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', req.goal)
             fwd_to = email_match.group(0) if email_match else "rahul@example.com"
@@ -173,7 +195,7 @@ async def execute_goal(req: GoalRequest):
             await push_stream_event("APPROVAL_REQUIRED", f"Forward draft staged to {fwd_to}. Review in modal.", fwd_res["payload"])
             return fwd_res
 
-        # 1C. Standard Compose / Send Intent
+        # 2C. Standard Compose / Send Intent
         else:
             email_match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', req.goal)
             recipient = email_match.group(0) if email_match else "mehtadev2004@gmail.com"
@@ -191,32 +213,12 @@ async def execute_goal(req: GoalRequest):
             await push_stream_event("APPROVAL_REQUIRED", f"Email draft prepared for {recipient}. Review details in popup.", draft_res["payload"])
             return draft_res
 
-    # ─── 2. FORM & MULTI-STEP WEB TASK WORKFLOWS ───
-    elif any(k in goal_text for k in ["form", "apply", "register", "signup", "sign up", "book", "application"]) or req.target_url:
-        url_match = re.search(r'https?://[^\s]+', req.goal)
-        url = url_match.group(0) if url_match else req.target_url
-        
-        if not url or url == "https://forms.gle/sample" or "<paste-form-url-here>" in url or "<url>" in url:
-            await push_stream_event("COMPLETED", "Target URL missing. Please include your target webpage or form link: e.g. 'Fill form at https://...'")
-            return {"status": "URL_REQUIRED", "message": "Please provide a valid URL in prompt."}
+    # ─── Priority 3: Form / Apply / Register without direct URL in prompt ───
+    elif any(k in goal_text for k in ["form", "from", "apply", "register", "signup", "sign up", "book", "application"]):
+        await push_stream_event("COMPLETED", "Please include the target website or form link: e.g. 'Fill form at https://...'")
+        return {"status": "URL_REQUIRED", "message": "Please provide a valid URL in prompt."}
 
-        await push_stream_event("DOM_ACTION", f"Navigating to target webpage: {url}")
-        await push_stream_event("DOM_ACTION", "Inspecting form controls, radio groups, file pickers, and text inputs...")
-        await push_stream_event("MEMORY_QUERY", "Retrieving profile attributes, resume files, and custom notes...")
-
-        # If Google Form, use specialized Google Form tool
-        if "docs.google.com/forms" in url or "forms.gle" in url:
-            form_res = await form_tool.process_form(url)
-        else:
-            # General web workflow (Lever, Greenhouse, Conference, Custom)
-            form_res = await universal_web_tool.execute_web_task(url, req.goal)
-
-        filled_count = len(form_res["payload"].get("filled_fields", []))
-        await push_stream_event("DOM_ACTION", f"Populated {filled_count} fields directly on open Chrome page.")
-        await push_stream_event("APPROVAL_REQUIRED", f"Review sheet generated ({filled_count} fields). Click Approve & Submit to proceed on Chrome.", form_res["payload"])
-        return form_res
-
-    # ─── 3. REAL WEB RESEARCH WORKFLOW ───
+    # ─── Priority 4: Real Web Search & Research ───
     else:
         query = req.goal.replace("search", "").replace("find", "").replace("research", "").strip()
         search_url = f"https://www.google.com/search?q={query.replace(' ', '+')}"

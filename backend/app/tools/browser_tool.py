@@ -276,29 +276,67 @@ class BrowserTool:
                     }
                 });
 
-                // Fallback: also scan for inputs NOT inside listitem blocks (non-Google-Forms pages)
+                // Universal Scanner for non-Google-Forms pages (Taleo, Greenhouse, Lever, Workday, Portals)
                 if (results.length === 0) {
-                    const inputs = Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"], textarea'));
-                    inputs.forEach((inp, idx) => {
-                        let container = inp.closest('div[role="listitem"]') || inp.closest('div[jsmodel]') || inp.parentElement?.parentElement;
-                        let headingText = '';
-                        if (container) {
-                            const headingEl = container.querySelector('div[role="heading"], .M7eMe, span');
-                            if (headingEl) headingText = headingEl.innerText;
+                    const allInputs = Array.from(document.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"]), textarea, select'));
+                    
+                    allInputs.forEach((inp, idx) => {
+                        const tag = inp.tagName.toLowerCase();
+                        const type = inp.type ? inp.type.toLowerCase() : 'text';
+                        
+                        // Find associated label text
+                        let labelText = '';
+                        if (inp.id) {
+                            const lbl = document.querySelector(`label[for="${inp.id}"]`);
+                            if (lbl) labelText = lbl.innerText.trim();
                         }
-                        if (!headingText && inp.getAttribute('aria-label')) headingText = inp.getAttribute('aria-label');
-                        if (!headingText && inp.placeholder) headingText = inp.placeholder;
+                        if (!labelText) {
+                            const parentLbl = inp.closest('label');
+                            if (parentLbl) labelText = parentLbl.innerText.trim();
+                        }
+                        if (!labelText && inp.getAttribute('aria-label')) {
+                            labelText = inp.getAttribute('aria-label').trim();
+                        }
+                        if (!labelText && inp.placeholder) {
+                            labelText = inp.placeholder.trim();
+                        }
+                        if (!labelText && inp.name) {
+                            labelText = inp.name.replace(/([A-Z])/g, ' $1').replace(/[-_]/g, ' ').trim();
+                        }
+
+                        // Determine field type
+                        let fType = 'text';
+                        let options = [];
+                        let currVal = inp.value || '';
+
+                        if (type === 'file') {
+                            fType = 'file';
+                        } else if (type === 'radio') {
+                            fType = 'radio';
+                            options = [inp.value || labelText];
+                        } else if (type === 'checkbox') {
+                            fType = 'checkbox';
+                            options = [inp.value || labelText];
+                        } else if (tag === 'select') {
+                            fType = 'dropdown';
+                            options = Array.from(inp.options).map(o => o.text.trim()).filter(t => t && t !== 'Select' && t !== '-- Select --');
+                            currVal = inp.options[inp.selectedIndex]?.text || '';
+                        } else if (tag === 'textarea') {
+                            fType = 'text';
+                        }
+
                         results.push({
                             id: inp.id || `input_${idx}`,
                             name: inp.name || '',
-                            type: inp.type || 'text',
-                            tagName: inp.tagName.toLowerCase(),
+                            type: type,
+                            tagName: tag,
                             placeholder: inp.placeholder || '',
-                            labelText: (headingText || '').trim().split('\\n')[0],
-                            value: inp.value || '',
-                            required: container ? container.innerText.includes('*') : false,
+                            labelText: (labelText || `Field ${idx + 1}`).split('\\n')[0].trim(),
+                            value: currVal,
+                            options: options,
+                            required: inp.required || inp.getAttribute('aria-required') === 'true',
                             questionIndex: idx,
-                            fieldType: 'text'
+                            fieldType: fType
                         });
                     });
                 }
