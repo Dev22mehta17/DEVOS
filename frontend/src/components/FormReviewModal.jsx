@@ -12,6 +12,7 @@ export default function FormReviewModal({ formData, onApprove, onReject }) {
   const [resumeList, setResumeList] = useState([]);
   const [customUploadMsg, setCustomUploadMsg] = useState('');
   const [generatingFieldIdx, setGeneratingFieldIdx] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (filled_fields) {
@@ -141,6 +142,8 @@ export default function FormReviewModal({ formData, onApprove, onReject }) {
   };
 
   const handleApproveSubmit = () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     const mergedFields = [...fields];
     if (flagged_fields) {
       flagged_fields.forEach((f, i) => {
@@ -419,11 +422,12 @@ export default function FormReviewModal({ formData, onApprove, onReject }) {
         </div>
 
         <div className="modal-actions" style={{ paddingTop: '0.6rem', borderTop: '1px solid var(--border-color)' }}>
-          <button className="btn-secondary" onClick={() => onReject(action_id)}>
+          <button className="btn-secondary" onClick={() => onReject(action_id)} disabled={isSubmitting}>
             <X size={16} style={{ marginRight: '0.4rem' }} /> Cancel
           </button>
-          <button className="btn-primary" onClick={handleApproveSubmit}>
-            <CheckCircle size={16} style={{ marginRight: '0.4rem' }} /> Approve & Submit Form
+          <button className="btn-primary" onClick={handleApproveSubmit} disabled={isSubmitting}>
+            <CheckCircle size={16} style={{ marginRight: '0.4rem' }} /> 
+            {isSubmitting ? 'Submitting to Chrome...' : 'Approve & Submit Form'}
           </button>
         </div>
       </div>

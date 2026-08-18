@@ -10,8 +10,11 @@ export default function EmailPreviewModal({ emailData, onApprove, onReject }) {
   const [editSubject, setEditSubject] = useState(subject || '');
   const [editBody, setEditBody] = useState(body || '');
   const [editAttachedFile, setEditAttachedFile] = useState(attached_file || '');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleApproveClick = () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     onApprove(action_id, {
       recipient: editRecipient,
       subject: editSubject,
@@ -120,11 +123,12 @@ export default function EmailPreviewModal({ emailData, onApprove, onReject }) {
         </div>
 
         <div className="modal-actions">
-          <button className="btn-secondary" onClick={() => onReject(action_id)}>
+          <button className="btn-secondary" onClick={() => onReject(action_id)} disabled={isSubmitting}>
             <X size={16} style={{ marginRight: '0.4rem' }} /> Cancel
           </button>
-          <button className="btn-primary" onClick={handleApproveClick}>
-            <Send size={16} style={{ marginRight: '0.4rem' }} /> Approve & Send Email
+          <button className="btn-primary" onClick={handleApproveClick} disabled={isSubmitting}>
+            <Send size={16} style={{ marginRight: '0.4rem' }} /> 
+            {isSubmitting ? 'Sending via Chrome...' : 'Approve & Send Email'}
           </button>
         </div>
       </div>

@@ -269,26 +269,30 @@ class FormTool:
         if not approved:
             return {"status": "REJECTED", "message": "Form submission was not approved."}
 
-        logger.info(f"[FormTool] Executing form submission for action {action_id}")
+        logger.info(f"[FormTool] Executing instant form submission for action {action_id}")
 
-        if not browser_tool.page:
-            return {"status": "ERROR", "message": "No browser page available"}
-
-        page = browser_tool.page
-
-        # Step 1: Re-navigate to the form URL
+        page = await browser_tool.get_active_page()
         form_url = approval_payload.get("form_url") if approval_payload else None
-        if form_url:
-            logger.info(f"[FormTool] Re-navigating to form: {form_url}")
-            await page.goto(form_url, wait_until="domcontentloaded", timeout=30000)
-            await asyncio.sleep(3.0)
 
-        # Step 2: Fill all text fields (user may have edited them in the review modal)
-        text_idx = 0
+        # Check if the page is currently on the form or needs re-navigation
+        current_url = page.url
+        is_already_on_form = form_url and (
+            form_url in current_url or 
+            "docs.google.com/forms" in current_url or 
+            "forms.gle" in current_url
+        )
+
+        if not is_already_on_form and form_url:
+            logger.info(f"[FormTool] Navigating to form: {form_url}")
+            await page.goto(form_url, wait_until="domcontentloaded", timeout=30000)
+            await asyncio.sleep(2.0)
+
+        # Step 1: Update fields if user edited them in modal
         all_fields = []
         if approval_payload:
             all_fields = approval_payload.get("updated_fields", []) or approval_payload.get("filled_fields", [])
 
+        text_idx = 0
         for f in all_fields:
             ft = f.get("fieldType", "text")
             val = f.get("value", "")
@@ -296,54 +300,51 @@ class FormTool:
             if ft == "text" and val and not val.startswith("[ATTACHED FILE]"):
                 f_idx = f.get("index", text_idx)
                 f_name = f.get("name", "")
-                filled = await browser_tool.fill_input_by_index_or_name(f_idx, f_name, val)
-                logger.info(f"[FormTool] Filled text field '{f.get('field_label', '')}' -> {filled}")
+                await browser_tool.fill_input_by_index_or_name(f_idx, f_name, val)
                 text_idx += 1
 
             elif ft == "radio" and val:
                 q_idx = f.get("questionIndex", 0)
                 label = f.get("field_label", "")
-                success = await browser_tool.select_radio_option(q_idx, val, label)
-                logger.info(f"[FormTool] Selected radio '{val}' for '{label}' -> {success}")
+                await browser_tool.select_radio_option(q_idx, val, label)
 
             elif ft == "checkbox" and val:
                 q_idx = f.get("questionIndex", 0)
                 label = f.get("field_label", "")
                 selected_opts = [v.strip() for v in val.split(",")]
-                success = await browser_tool.select_checkbox_options(q_idx, selected_opts, label)
-                logger.info(f"[FormTool] Selected checkboxes {selected_opts} for '{label}' -> {success}")
+                await browser_tool.select_checkbox_options(q_idx, selected_opts, label)
 
             elif ft == "dropdown" and val:
                 q_idx = f.get("questionIndex", 0)
                 label = f.get("field_label", "")
-                success = await browser_tool.select_dropdown_option(q_idx, val, label)
-                logger.info(f"[FormTool] Selected dropdown '{val}' for '{label}' -> {success}")
+                await browser_tool.select_dropdown_option(q_idx, val, label)
 
-        await asyncio.sleep(1.0)
-
-        # Step 3: Upload resume file if required
+        # Step 2: Upload resume ONLY if not already attached on page
         selected_res = approval_payload.get("selected_resume") if approval_payload else None
         if selected_res:
-            resolved_path = FormTool._resolve_resume_path(selected_res)
-            if resolved_path and os.path.exists(resolved_path):
-                logger.info(f"[FormTool] Uploading resume: {resolved_path}")
-                upload_ok = await browser_tool.upload_file_to_google_form(resolved_path)
-                logger.info(f"[FormTool] Resume upload result: {upload_ok}")
-                if upload_ok:
-                    await asyncio.sleep(3.0)
-            else:
-                logger.warning(f"[FormTool] Resume file not found: {selected_res} (resolved: {resolved_path})")
+            # Check if file is already attached on page (e.g. badge visible)
+            has_attached_file = await page.evaluate("""() => {
+                const attachedBadge = document.querySelector('.s09pje, div[data-item-id], div[aria-label*="Remove file"], span:has-text(".pdf")');
+                return !!attachedBadge;
+            }""")
 
-        # Step 4: Click Submit
-        await asyncio.sleep(1.0)
+            if not has_attached_file:
+                resolved_path = FormTool._resolve_resume_path(selected_res)
+                if resolved_path and os.path.exists(resolved_path):
+                    logger.info(f"[FormTool] Uploading resume: {resolved_path}")
+                    await browser_tool.upload_file_to_google_form(resolved_path)
+            else:
+                logger.info("[FormTool] Resume already attached on form. Skipping re-upload.")
+
+        # Step 3: Instant Submit click
         submitted = await browser_tool.click_submit_button()
         logger.info(f"[FormTool] Submit button clicked: {submitted}")
 
-        # Step 5: Verify submission
-        await asyncio.sleep(2.0)
+        # Step 4: Verification
+        await asyncio.sleep(1.2)
         try:
             page_text = await page.inner_text("body")
-            if "your response has been recorded" in page_text.lower() or "thanks" in page_text.lower():
+            if "your response has been recorded" in page_text.lower() or "thanks" in page_text.lower() or "submitted" in page_text.lower():
                 logger.info("[FormTool] ✅ Form submission confirmed — success page detected")
                 return {
                     "status": "SUBMITTED",
@@ -360,7 +361,7 @@ class FormTool:
             "action_id": action_id,
             "submitted_on_chrome": submitted,
             "verified": False,
-            "message": "Form submit clicked on Chrome." if submitted else "Form submit button not found."
+            "message": "Form submitted on Chrome." if submitted else "Form submit button not found."
         }
 
 

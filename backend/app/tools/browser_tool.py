@@ -54,13 +54,49 @@ class BrowserTool:
             self.is_connected = False
             return False
 
-    async def navigate(self, url: str) -> Dict[str, Any]:
-        if not self.page:
-            await self.initialize()
+    async def get_active_page(self) -> Page:
+        """Returns an active, alive Playwright Page, automatically reconnecting via CDP if closed."""
         try:
-            await self.page.goto(url, wait_until="domcontentloaded", timeout=30000)
-            title = await self.page.title()
-            current_url = self.page.url
+            if not self.browser or not self.browser.is_connected():
+                logger.info("[BrowserTool] Reconnecting to Chrome via CDP...")
+                await self.initialize()
+
+            if not self.context:
+                contexts = self.browser.contexts if self.browser else []
+                self.context = contexts[0] if contexts else await self.browser.new_context()
+
+            # 1. Reuse existing non-closed page
+            if self.page and not self.page.is_closed():
+                return self.page
+
+            # 2. Check existing open pages in context
+            if self.context:
+                pages = self.context.pages
+                for p in pages:
+                    if not p.is_closed():
+                        self.page = p
+                        return self.page
+
+                # 3. Create new page if all were closed
+                self.page = await self.context.new_page()
+                return self.page
+        except Exception as e:
+            logger.warning(f"[BrowserTool] Recovering active page: {e}")
+            await self.initialize()
+            if self.page and not self.page.is_closed():
+                return self.page
+            if self.context:
+                self.page = await self.context.new_page()
+                return self.page
+
+        raise RuntimeError("Failed to acquire active Chrome page.")
+
+    async def navigate(self, url: str) -> Dict[str, Any]:
+        page = await self.get_active_page()
+        try:
+            await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            title = await page.title()
+            current_url = page.url
             return {
                 "status": "SUCCESS",
                 "title": title,

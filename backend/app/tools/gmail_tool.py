@@ -71,18 +71,14 @@ class GmailTool:
     @staticmethod
     async def search_and_read_thread(query: str) -> Dict[str, Any]:
         """Searches Gmail for emails matching a query and extracts details of the latest thread."""
-        if not browser_tool.context:
-            await browser_tool.initialize()
-
-        page = None
         try:
-            page = await browser_tool.context.new_page()
+            page = await browser_tool.get_active_page()
             encoded_query = query.replace(" ", "+")
             search_url = f"https://mail.google.com/mail/u/0/#search/{encoded_query}"
             logger.info(f"[Gmail] Searching emails: {search_url}")
 
             await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
-            await asyncio.sleep(4.0)
+            await asyncio.sleep(3.5)
 
             # Extract list of search result email rows
             thread_info = await page.evaluate("""() => {
@@ -90,20 +86,18 @@ class GmailTool:
                 if (rows.length === 0) return null;
 
                 const firstRow = rows[0];
-                const senderEl = firstRow.querySelector('.zF, .yW span, .bA4 span');
+                const senderEl = firstRow.querySelector('.zF, .yW span, .bA4 span, span[email]');
                 const subjectEl = firstRow.querySelector('.bog span, .y6 span');
                 const snippetEl = firstRow.querySelector('.y2');
                 const dateEl = firstRow.querySelector('.xW span, .xY');
 
                 return {
-                    sender: senderEl ? senderEl.innerText.trim() : 'Unknown Sender',
-                    subject: subjectEl ? subjectEl.innerText.trim() : 'No Subject',
+                    sender: senderEl ? (senderEl.getAttribute('email') || senderEl.innerText.trim()) : 'Recruiter / Hiring Team',
+                    subject: subjectEl ? subjectEl.innerText.trim() : 'Interview Opportunity',
                     snippet: snippetEl ? snippetEl.innerText.trim() : '',
                     date: dateEl ? dateEl.innerText.trim() : ''
                 };
             }""")
-
-            await page.close()
 
             if thread_info:
                 logger.info(f"[Gmail] Found email thread: from='{thread_info['sender']}', subject='{thread_info['subject']}'")
@@ -114,11 +108,6 @@ class GmailTool:
 
         except Exception as e:
             logger.error(f"[Gmail] Error searching emails: {e}")
-            if page:
-                try:
-                    await page.close()
-                except Exception:
-                    pass
             return {"status": "ERROR", "message": str(e)}
 
     @staticmethod
@@ -238,10 +227,11 @@ class GmailTool:
             return {"status": "ERROR", "sent_on_chrome": False, "message": "No browser context"}
 
         page = None
+        page = None
         try:
-            page = await browser_tool.context.new_page()
+            page = await browser_tool.get_active_page()
             await page.goto("https://mail.google.com/mail/u/0/#inbox", wait_until="domcontentloaded", timeout=30000)
-            await asyncio.sleep(4.0)
+            await asyncio.sleep(3.5)
 
             # Step 1: Click Compose
             compose_clicked = False
@@ -281,7 +271,7 @@ class GmailTool:
                     if to_field:
                         await to_field.click()
                         await to_field.fill("")
-                        await page.keyboard.type(recipient, delay=30)
+                        await page.keyboard.type(recipient, delay=25)
                         await asyncio.sleep(0.5)
                         await page.keyboard.press("Tab")
                         to_filled = True
@@ -290,7 +280,6 @@ class GmailTool:
                     continue
 
             if not to_filled:
-                await page.close()
                 return {"status": "ERROR", "sent_on_chrome": False, "message": "Could not find To field on Gmail"}
 
             await asyncio.sleep(0.8)
@@ -360,8 +349,7 @@ class GmailTool:
                 except Exception:
                     pass
 
-            await asyncio.sleep(3.0)
-            await page.close()
+            await asyncio.sleep(2.5)
 
             return {
                 "status": "SENT" if send_clicked else "ERROR",
@@ -372,11 +360,6 @@ class GmailTool:
 
         except Exception as e:
             logger.error(f"[Gmail] Fatal error: {e}")
-            if page:
-                try:
-                    await page.close()
-                except Exception:
-                    pass
             return {
                 "status": "ERROR",
                 "action_id": action_id,
