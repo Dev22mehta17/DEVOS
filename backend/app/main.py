@@ -1,23 +1,27 @@
 import asyncio
 import json
 import logging
-from typing import Dict, Any
-from fastapi import FastAPI, HTTPException, Request
+import re
+from typing import Dict, Any, Optional
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from sse_starlette.sse import EventSourceResponse
 from pydantic import BaseModel
+from pathlib import Path
 
 from app.core.memory_engine import memory_engine
 from app.core.permission_engine import permission_engine
+from app.core.answer_generator import answer_generator
 from app.tools.browser_tool import browser_tool
 from app.tools.gmail_tool import gmail_tool
 from app.tools.form_tool import form_tool
 from app.tools.file_tool import file_tool
+from app.tools.universal_web_tool import universal_web_tool
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="JARVIS Personal Computer Agent Backend", version="1.0.0")
+app = FastAPI(title="JARVIS Personal Computer Agent Backend", version="2.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -33,7 +37,7 @@ stream_queue: asyncio.Queue = asyncio.Queue()
 async def push_stream_event(step_type: str, message: str, details: Dict[str, Any] = None):
     """Pushes a live thinking/action log to the frontend SSE stream."""
     event = {
-        "step_type": step_type,  # THINKING, DOM_ACTION, MEMORY_QUERY, FILE_SEARCH, APPROVAL_REQUIRED, COMPLETED
+        "step_type": step_type,
         "message": message,
         "details": details or {}
     }
@@ -41,11 +45,16 @@ async def push_stream_event(step_type: str, message: str, details: Dict[str, Any
 
 class GoalRequest(BaseModel):
     goal: str
-    target_url: str = None
+    target_url: Optional[str] = None
 
 class ActionApprovalRequest(BaseModel):
     action_id: str
-    payload: Dict[str, Any] = None
+    payload: Optional[Dict[str, Any]] = None
+
+class GenerateAnswerRequest(BaseModel):
+    question: str
+    context_hints: Optional[str] = ""
+    max_words: Optional[int] = 150
 
 @app.on_event("startup")
 async def startup_event():
@@ -90,16 +99,11 @@ async def update_memory(data: Dict[str, Any]):
         raise HTTPException(status_code=500, detail="Failed to update profile memory.")
     return {"status": "SUCCESS", "data": memory_engine.profile_data}
 
-from fastapi import UploadFile, File
-from pathlib import Path
-
 @app.post("/api/memory/upload")
 async def upload_document_memory(file: UploadFile = File(...)):
-    """Uploads a PDF/TXT resume or doc, extracts text, saves file to disk, and ingests into memory."""
+    """Uploads a PDF/TXT resume or doc, extracts text, saves file to disk, and ingests into vector memory."""
     try:
         content = await file.read()
-
-        # Extract text from PDF or plain text
         text = ""
         if file.filename.lower().endswith(".pdf"):
             import io
@@ -110,7 +114,6 @@ async def upload_document_memory(file: UploadFile = File(...)):
         else:
             text = content.decode("utf-8", errors="ignore")
 
-        # Save file to disk so Playwright can upload it later
         upload_dir = Path(__file__).parent.parent / "uploads"
         upload_dir.mkdir(parents=True, exist_ok=True)
         saved_file = upload_dir / file.filename
@@ -125,57 +128,100 @@ async def upload_document_memory(file: UploadFile = File(...)):
         logger.error(f"Upload error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to process file: {str(e)}")
 
+@app.post("/api/generate-answer")
+async def generate_custom_answer(req: GenerateAnswerRequest):
+    """Dynamic LLM / semantic answer generator for open-ended application questions."""
+    await push_stream_event("THINKING", f"Synthesizing personalized answer for: '{req.question[:60]}...'")
+    res = answer_generator.generate_answer(req.question, req.context_hints, req.max_words)
+    await push_stream_event("MEMORY_QUERY", f"Answer synthesized via {res.get('source')} for question: '{req.question[:40]}'")
+    return res
+
 @app.post("/api/execute")
 async def execute_goal(req: GoalRequest):
     goal_text = req.goal.lower()
     await push_stream_event("THINKING", f"Analyzing goal intent: '{req.goal}'")
     
-    # Workflow 1: Gmail Compose
-    if "email" in goal_text or "mail" in goal_text:
-        import re
-        email_match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', req.goal)
-        recipient = email_match.group(0) if email_match else "mehtadev2004@gmail.com"
+    # ─── 1. GMAIL AGENT WORKFLOWS ───
+    if any(k in goal_text for k in ["email", "mail", "gmail", "inbox", "recruiter", "hr"]):
         
-        await push_stream_event("MEMORY_QUERY", f"Target Recipient: '{recipient}'. Fetching account context...")
-        await push_stream_event("DOM_ACTION", "Connecting to active Chrome session on port 9222...")
-        await push_stream_event("DOM_ACTION", "Navigating Chrome tab to https://mail.google.com...")
-        
-        draft_res = await gmail_tool.create_draft(
-            recipient=recipient,
-            subject="Availability Tomorrow",
-            body=f"Hi,\n\nI'll be available tomorrow after 4 PM.\n\nBest,\nDev"
-        )
-        
-        await push_stream_event("APPROVAL_REQUIRED", f"Email draft prepared for {recipient}. Review details in popup.", draft_res["payload"])
-        return draft_res
+        # 1A. Reply Intent
+        if any(k in goal_text for k in ["reply", "respond", "answer to"]):
+            # Extract target search query (e.g. "from Amazon HR", "recruiter", "interview")
+            search_query = "recruiter"
+            if "from" in goal_text:
+                search_query = req.goal.split("from")[-1].split("and")[0].strip()
+            elif "about" in goal_text:
+                search_query = req.goal.split("about")[-1].strip()
 
-    # Workflow 2: Google Forms / Application filling
-    elif "form" in goal_text or "apply" in goal_text or req.target_url:
-        import re
+            await push_stream_event("DOM_ACTION", f"Searching Gmail threads for: '{search_query}'...")
+            attach_res = "resume" in goal_text or "cv" in goal_text
+            reply_res = await gmail_tool.create_reply_draft(search_query, reply_intent=req.goal, attach_resume=attach_res)
+            
+            await push_stream_event("APPROVAL_REQUIRED", f"Reply draft staged for {reply_res['payload']['recipient']}. Review in modal.", reply_res["payload"])
+            return reply_res
+
+        # 1B. Forward Intent
+        elif any(k in goal_text for k in ["forward", "fwd"]):
+            email_match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', req.goal)
+            fwd_to = email_match.group(0) if email_match else "rahul@example.com"
+            search_query = "interview"
+            if "about" in goal_text:
+                search_query = req.goal.split("about")[-1].split("to")[0].strip()
+            
+            await push_stream_event("DOM_ACTION", f"Locating email to forward matching: '{search_query}'...")
+            fwd_res = await gmail_tool.create_forward_draft(search_query, forward_to=fwd_to, explanation=req.goal)
+            await push_stream_event("APPROVAL_REQUIRED", f"Forward draft staged to {fwd_to}. Review in modal.", fwd_res["payload"])
+            return fwd_res
+
+        # 1C. Standard Compose / Send Intent
+        else:
+            email_match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', req.goal)
+            recipient = email_match.group(0) if email_match else "mehtadev2004@gmail.com"
+            attach_resume = any(k in goal_text for k in ["resume", "cv", "pdf", "attach"])
+            
+            await push_stream_event("MEMORY_QUERY", f"Preparing email to: '{recipient}' (Attach Resume: {attach_resume})...")
+            
+            draft_res = await gmail_tool.create_draft(
+                recipient=recipient,
+                subject="Application / Availability Follow-up",
+                body=f"Hi,\n\nI am writing to express my interest and confirm my availability. Looking forward to connecting with your team!",
+                attach_resume=attach_resume
+            )
+            
+            await push_stream_event("APPROVAL_REQUIRED", f"Email draft prepared for {recipient}. Review details in popup.", draft_res["payload"])
+            return draft_res
+
+    # ─── 2. FORM & MULTI-STEP WEB TASK WORKFLOWS ───
+    elif any(k in goal_text for k in ["form", "apply", "register", "signup", "sign up", "book", "application"]) or req.target_url:
         url_match = re.search(r'https?://[^\s]+', req.goal)
         url = url_match.group(0) if url_match else req.target_url
         
         if not url or url == "https://forms.gle/sample" or "<paste-form-url-here>" in url or "<url>" in url:
-            await push_stream_event("COMPLETED", "Form URL missing. Please include your target form link in prompt: e.g. 'Fill form at https://forms.gle/xyz'")
-            return {"status": "URL_REQUIRED", "message": "Please provide a valid form URL in prompt."}
+            await push_stream_event("COMPLETED", "Target URL missing. Please include your target webpage or form link: e.g. 'Fill form at https://...'")
+            return {"status": "URL_REQUIRED", "message": "Please provide a valid URL in prompt."}
 
-        await push_stream_event("DOM_ACTION", f"Navigating to web form: {url}")
-        await push_stream_event("DOM_ACTION", "Inspecting HTML input fields, placeholders, and labels...")
-        await push_stream_event("MEMORY_QUERY", "Fetching candidate attributes (University, Degree, GPA, LinkedIn, GitHub)...")
-        await push_stream_event("FILE_SEARCH", "Scanning ~/Downloads & ~/Documents for resume PDF...")
-        
-        form_res = await form_tool.process_form(url)
+        await push_stream_event("DOM_ACTION", f"Navigating to target webpage: {url}")
+        await push_stream_event("DOM_ACTION", "Inspecting form controls, radio groups, file pickers, and text inputs...")
+        await push_stream_event("MEMORY_QUERY", "Retrieving profile attributes, resume files, and custom notes...")
+
+        # If Google Form, use specialized Google Form tool
+        if "docs.google.com/forms" in url or "forms.gle" in url:
+            form_res = await form_tool.process_form(url)
+        else:
+            # General web workflow (Lever, Greenhouse, Conference, Custom)
+            form_res = await universal_web_tool.execute_web_task(url, req.goal)
+
         filled_count = len(form_res["payload"].get("filled_fields", []))
-        await push_stream_event("DOM_ACTION", f"Auto-filled {filled_count} fields directly on open Chrome page (Name, Email, Mobile, Education).")
-        await push_stream_event("APPROVAL_REQUIRED", f"Form review sheet generated ({filled_count} fields populated). Click Approve & Submit to submit on Chrome.", form_res["payload"])
+        await push_stream_event("DOM_ACTION", f"Populated {filled_count} fields directly on open Chrome page.")
+        await push_stream_event("APPROVAL_REQUIRED", f"Review sheet generated ({filled_count} fields). Click Approve & Submit to proceed on Chrome.", form_res["payload"])
         return form_res
 
-    # Workflow 3: Real Web Search & Research
+    # ─── 3. REAL WEB RESEARCH WORKFLOW ───
     else:
         query = req.goal.replace("search", "").replace("find", "").replace("research", "").strip()
         search_url = f"https://www.google.com/search?q={query.replace(' ', '+')}"
         await push_stream_event("DOM_ACTION", f"Submitting search query to Google: '{query}'")
-        nav_res = await browser_tool.navigate(search_url)
+        await browser_tool.navigate(search_url)
         await push_stream_event("COMPLETED", f"Search completed for '{query}'. Top results displayed in Chrome.")
         return {"status": "COMPLETED", "query": query, "url": search_url}
 
@@ -190,7 +236,7 @@ async def approve_action(req: ActionApprovalRequest):
         else:
             await push_stream_event("COMPLETED", f"⚠️ Email send issue: {res.get('message', 'Unknown error')}")
         return res
-    elif "form" in req.action_id:
+    elif "form" in req.action_id or "web" in req.action_id:
         res = await form_tool.submit_form(req.action_id, req.payload)
         if res.get("submitted_on_chrome"):
             verified = "✅ Verified!" if res.get("verified") else "(click verification pending)"

@@ -157,11 +157,10 @@ class FormTool:
 
             # ─── Text / Textarea / Email / Phone / etc ───
             val = memory_engine.get_field_value(label)
-            if val is not None:
+            if val is not None and val != "":
                 idx = text_input_idx
                 name_str = inp.get("name", "")
-                if val:  # Only fill if non-empty (empty string = user should fill)
-                    await browser_tool.fill_input_by_index_or_name(idx, name_str, str(val))
+                await browser_tool.fill_input_by_index_or_name(idx, name_str, str(val))
                 filled_fields.append({
                     "field_label": label,
                     "field_id": inp.get("id"),
@@ -173,18 +172,32 @@ class FormTool:
                     "questionIndex": q_index
                 })
             else:
-                # Try semantic memory for open-ended questions
-                if field_type in ("textarea", "text") and any(k in label.lower() for k in ["why", "describe", "about", "project", "tell us", "cover letter", "motivation"]):
-                    context_snippets = memory_engine.query_semantic_memory(label)
-                    gen_ans = f"Based on my experience as SDE intern at Amazon and B.E. Computer Engineering at Thapar University: {' '.join(context_snippets[:2])}"
+                # Use AnswerGenerator for open-ended or long-form questions
+                from app.core.answer_generator import answer_generator
+                page_title = nav_result.get("title", "")
+                is_open_ended = (
+                    field_type == "textarea" or 
+                    any(k in label.lower() for k in [
+                        "why", "describe", "about", "project", "tell us", "cover letter", 
+                        "motivation", "challenge", "background", "experience", "hire", "interest",
+                        "comment", "anything else", "note", "statement", "essay"
+                    ])
+                )
+
+                if is_open_ended:
+                    gen_res = answer_generator.generate_answer(label, f"{page_title} {form_url}")
+                    gen_ans = gen_res.get("answer", "")
                     idx = text_input_idx
                     name_str = inp.get("name", "")
-                    await browser_tool.fill_input_by_index_or_name(idx, name_str, gen_ans[:500])
+                    if gen_ans:
+                        await browser_tool.fill_input_by_index_or_name(idx, name_str, gen_ans[:500])
                     filled_fields.append({
                         "field_label": label,
                         "field_id": inp.get("id"),
                         "value": gen_ans[:500],
                         "is_ai_generated": True,
+                        "ai_source": gen_res.get("source"),
+                        "ai_company": gen_res.get("company"),
                         "fieldType": "text",
                         "index": idx,
                         "name": name_str,

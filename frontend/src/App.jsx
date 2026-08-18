@@ -186,14 +186,22 @@ export default function App() {
             </div>
 
             {/* Quick Presets */}
-            <div className="chips-row">
+            <div className="chips-row" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
               <button
                 className="chip-btn"
                 onClick={() => {
-                  setGoal("Send an email to mehtadev2004@gmail.com saying I'll be available tomorrow after 4 PM");
+                  setGoal("Reply to the latest email from recruiter confirming my availability tomorrow and attach my resume");
                 }}
               >
-                ✉️ Gmail: Send Email to mehtadev2004@gmail.com
+                ✉️ Gmail: Find & Reply to Recruiter
+              </button>
+              <button
+                className="chip-btn"
+                onClick={() => {
+                  setGoal("Forward interview email to rahul@example.com with an explanation note");
+                }}
+              >
+                📬 Gmail: Forward with Note
               </button>
               <button
                 className="chip-btn"
@@ -201,15 +209,15 @@ export default function App() {
                   setGoal("Fill job application form at https://<paste-form-url-here> with my profile and attach Dev_Resume.pdf");
                 }}
               >
-                📝 Form: Auto-fill Job Application (Paste URL)
+                📝 Form: Auto-fill Application (Paste URL)
               </button>
               <button
                 className="chip-btn"
                 onClick={() => {
-                  setGoal("Find 5 SDE-1 remote jobs matching my Amazon intern profile and rank them");
+                  setGoal("Register me for the conference at https://<paste-url> using my profile details");
                 }}
               >
-                🔍 Research: Search SDE-1 Remote Jobs
+                🌐 Web: Universal Registration
               </button>
             </div>
           </div>

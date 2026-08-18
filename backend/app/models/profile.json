@@ -5,7 +5,8 @@
     "email_secondary": "dev.work@example.com",
     "phone": "+91-7206049507",
     "location": "Punjab, India",
-    "work_authorization": "Authorized to work in India & US Remote"
+    "work_authorization": "Authorized to work in India & US Remote",
+    "gender": "Male"
   },
   "education": {
     "university": "Thapar Institute Of Engineering and Technology, Patiala August 2022 - July 2026",
@@ -51,5 +52,19 @@
       "/Users/devmehta/Documents"
     ],
     "active_resume_path": "DevMehta_CV.pdf"
+  },
+  "extra_context": {
+    "career_narrative": "Passionate Software Engineer specializing in backend distributed systems, high-performance APIs, and browser automation agents. Worked as an SDE Intern at Amazon building scalable cloud microservices. Experienced in Python, FastAPI, React, Playwright, and PostgreSQL.",
+    "key_achievements": [
+      "Engineered local agent execution engine (DevOS) controlling Chrome via CDP with real-time SSE telemetry.",
+      "Built microservices and optimized API latency during SDE internship at Amazon.",
+      "Ranked in top academic tier at Thapar University with 8.7 CGPA in Computer Engineering."
+    ],
+    "company_alignments": {
+      "microsoft": "Excited about Microsoft's cloud infrastructure (Azure), TypeScript ecosystem, developer tooling, and modern AI innovations with Copilot.",
+      "amazon": "Deep appreciation for Amazon's Leadership Principles, Customer Obsession, and building high-scale distributed backend services.",
+      "google": "Drawn to Google's engineering excellence, distributed database architectures, and bleeding-edge AI agent frameworks."
+    },
+    "custom_user_notes": "I am actively looking for SDE-1 / Software Engineer roles with high ownership and challenging distributed systems problems."
   }
 }

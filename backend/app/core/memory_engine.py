@@ -55,17 +55,61 @@ class MemoryEngine:
             return
         # Flatten profile entries into semantic documents
         docs = [
-            "Dev Mehta is a Computer Engineering student at Thapar University graduating in 2026 with a GPA of 3.8.",
-            "Dev Mehta worked as a Software Development Engineer (SDE) Intern at Amazon building cloud microservices.",
-            "Dev Mehta's GitHub profile is https://github.com/devmehta and LinkedIn is https://linkedin.com/in/devmehta.",
+            "Dev Mehta is a Computer Engineering student at Thapar University graduating in 2026 with a GPA of 3.8 and 8.7 CGPA.",
+            "Dev Mehta worked as a Software Development Engineer (SDE) Intern at Amazon building scalable cloud microservices and optimizing API latency.",
+            "Dev Mehta engineered the DevOS local autonomous agent execution engine controlling Chrome via CDP with real-time SSE telemetry.",
+            "Dev Mehta's GitHub profile is https://github.com/Dev22mehta17 and LinkedIn is https://linkedin.com/in/DevMehta.",
             "Dev Mehta is authorized to work in India and Remote roles with immediate or 15 days notice period.",
-            "Skills include Python, FastAPI, JavaScript, React, Playwright, PostgreSQL, System Design, and Docker."
+            "Technical skills include Python, FastAPI, JavaScript, React, Playwright, PostgreSQL, System Design, Docker, and Git.",
+            "Career narrative: Passionate Software Engineer specializing in backend distributed systems, high-performance APIs, and browser automation agents.",
+            "Why join Microsoft: Excited about Microsoft's cloud infrastructure (Azure), TypeScript ecosystem, developer tooling, and modern AI innovations with Copilot.",
+            "Why join Amazon: Deep appreciation for Amazon's Leadership Principles, Customer Obsession, and building high-scale distributed backend services.",
+            "Why join Google: Drawn to Google's engineering excellence, distributed database architectures, and bleeding-edge AI agent frameworks."
         ]
-        ids = [f"doc_{i}" for i in range(len(docs))]
+        
+        # Ingest custom extra context if present in profile
+        extra = self.profile_data.get("extra_context", {})
+        if extra.get("career_narrative"):
+            docs.append(f"Career narrative: {extra['career_narrative']}")
+        if extra.get("custom_user_notes"):
+            docs.append(f"User career goals & notes: {extra['custom_user_notes']}")
+        for ach in extra.get("key_achievements", []):
+            docs.append(f"Key engineering achievement: {ach}")
+        for comp, align in extra.get("company_alignments", {}).items():
+            docs.append(f"Alignment with {comp}: {align}")
+
+        ids = [f"seed_doc_{i}" for i in range(len(docs))]
         try:
             self.collection.upsert(documents=docs, ids=ids)
+            logger.info(f"Seeded ChromaDB with {len(docs)} knowledge chunks.")
         except Exception as e:
             logger.error(f"Error seeding ChromaDB: {e}")
+
+    def get_extra_context(self) -> Dict[str, Any]:
+        """Returns the extra custom context notes and career narrative."""
+        return self.profile_data.get("extra_context", {})
+
+    def get_full_candidate_summary(self) -> str:
+        """Returns a comprehensive text summary of the candidate for LLM prompt context."""
+        p = self.profile_data
+        personal = p.get("personal", {})
+        edu = p.get("education", {})
+        prof = p.get("professional", {})
+        links = p.get("links", {})
+        extra = p.get("extra_context", {})
+
+        summary = f"""Candidate Name: {personal.get('full_name', 'Dev Mehta')}
+Email: {personal.get('email_primary', '')} | Phone: {personal.get('phone', '')} | Location: {personal.get('location', '')}
+Education: {edu.get('degree', '')} from {edu.get('university', '')} (Graduation: {edu.get('graduation_year', '2026')}, GPA: {edu.get('gpa', '3.8/4.0')})
+Current/Recent Experience: {prof.get('current_role', '')} at {prof.get('current_company', '')}
+Total Experience: {prof.get('total_experience', '1 year')}
+Core Skills: {', '.join(prof.get('skills', []))}
+Links: GitHub ({links.get('github', '')}), LinkedIn ({links.get('linkedin', '')}), Portfolio ({links.get('portfolio', '')})
+Career Narrative: {extra.get('career_narrative', prof.get('experience_summary', ''))}
+Key Achievements: {'; '.join(extra.get('key_achievements', []))}
+Custom Notes: {extra.get('custom_user_notes', '')}
+"""
+        return summary.strip()
 
     def add_document_context(self, text: str, filename: str) -> bool:
         """Ingests text from uploaded PDF/Doc into vector memory and auto-extracts profile details."""

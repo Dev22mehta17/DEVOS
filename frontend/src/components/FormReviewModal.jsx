@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, CheckCircle, AlertTriangle, Send, X, Paperclip, FileUp, ChevronDown, Edit3 } from 'lucide-react';
+import { FileText, CheckCircle, AlertTriangle, Send, X, Paperclip, FileUp, Sparkles, RefreshCw, Edit3 } from 'lucide-react';
 
 export default function FormReviewModal({ formData, onApprove, onReject }) {
   if (!formData) return null;
@@ -11,6 +11,7 @@ export default function FormReviewModal({ formData, onApprove, onReject }) {
   const [selectedResume, setSelectedResume] = useState(uploaded_resume || '');
   const [resumeList, setResumeList] = useState([]);
   const [customUploadMsg, setCustomUploadMsg] = useState('');
+  const [generatingFieldIdx, setGeneratingFieldIdx] = useState(null);
 
   useEffect(() => {
     if (filled_fields) {
@@ -27,7 +28,6 @@ export default function FormReviewModal({ formData, onApprove, onReject }) {
       setFields(unique);
     }
 
-    // Initialize userAnswers for flagged fields
     if (flagged_fields) {
       const answers = {};
       flagged_fields.forEach((f, i) => {
@@ -96,8 +96,51 @@ export default function FormReviewModal({ formData, onApprove, onReject }) {
     });
   };
 
+  const handleRegenerateAI = async (index, label) => {
+    setGeneratingFieldIdx(index);
+    try {
+      const res = await fetch('http://localhost:8000/api/generate-answer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: label,
+          context_hints: `${page_title} ${form_url}`
+        })
+      });
+      const data = await res.json();
+      if (data.answer) {
+        handleFieldChange(index, data.answer);
+      }
+    } catch (err) {
+      console.error('AI answer generation error:', err);
+    } finally {
+      setGeneratingFieldIdx(null);
+    }
+  };
+
+  const handleGenerateFlaggedAI = async (flagIdx, label) => {
+    setGeneratingFieldIdx(`flag_${flagIdx}`);
+    try {
+      const res = await fetch('http://localhost:8000/api/generate-answer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: label,
+          context_hints: `${page_title} ${form_url}`
+        })
+      });
+      const data = await res.json();
+      if (data.answer) {
+        handleFlaggedChange(flagIdx, data.answer);
+      }
+    } catch (err) {
+      console.error('AI answer generation error:', err);
+    } finally {
+      setGeneratingFieldIdx(null);
+    }
+  };
+
   const handleApproveSubmit = () => {
-    // Merge flagged fields that the user filled into the fields array
     const mergedFields = [...fields];
     if (flagged_fields) {
       flagged_fields.forEach((f, i) => {
@@ -146,26 +189,29 @@ export default function FormReviewModal({ formData, onApprove, onReject }) {
     color: color,
     padding: '2px 8px',
     borderRadius: '4px',
-    fontWeight: 600
+    fontWeight: 600,
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '0.2rem'
   });
 
   return (
     <div className="modal-overlay">
-      <div className="glass-panel modal-card" style={{ maxWidth: '780px' }}>
-        <div className="modal-header">
+      <div className="glass-panel modal-card" style={{ maxWidth: '800px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+        <div className="modal-header" style={{ marginBottom: '1rem' }}>
           <FileText size={24} color="#00e676" />
           <div>
-            <div className="modal-title">Form Application Review Sheet</div>
+            <div className="modal-title">Application & Form Review Sheet</div>
             <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Target: {page_title} ({form_url})</div>
           </div>
         </div>
 
         {/* Resume Selection Dropdown & Custom Upload */}
-        <div style={{ background: 'rgba(0, 242, 254, 0.08)', border: '1px solid var(--accent-cyan)', padding: '0.86rem 1rem', borderRadius: '10px', marginBottom: '1.2rem' }}>
+        <div style={{ background: 'rgba(0, 242, 254, 0.08)', border: '1px solid var(--accent-cyan)', padding: '0.86rem 1rem', borderRadius: '10px', marginBottom: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.88rem', fontWeight: 600, color: 'var(--accent-cyan)' }}>
               <Paperclip size={18} />
-              <span>Select Resume File to Attach:</span>
+              <span>Select Resume to Attach:</span>
             </div>
             <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-purple)', fontSize: '0.82rem', fontWeight: 600, background: 'rgba(127,0,255,0.15)', padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--accent-purple)' }}>
               <FileUp size={14} />
@@ -195,121 +241,184 @@ export default function FormReviewModal({ formData, onApprove, onReject }) {
           )}
         </div>
 
-        {/* Auto-filled Fields (editable) */}
-        <div style={{ maxHeight: '220px', overflowY: 'auto', marginBottom: '1rem', paddingRight: '0.5rem' }}>
-          <div style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--accent-cyan)', marginBottom: '0.6rem' }}>
-            ✅ Auto-filled Fields ({fields.length}) — click to edit:
-          </div>
-          {fields.map((f, i) => (
-            <div key={i} className="review-field-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.3rem', padding: '0.5rem 0' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '0.85rem' }}>
-                <span className="review-label" style={{ fontWeight: 600, color: 'var(--text-muted)' }}>{f.field_label}:</span>
-                <div style={{ display: 'flex', gap: '0.4rem' }}>
-                  {f.is_ai_generated && <span style={badgeStyle('var(--accent-purple)', 'rgba(127,0,255,0.2)')}>AI Answer</span>}
-                  {f.is_auto_matched && <span style={badgeStyle('var(--accent-emerald)', 'rgba(0,230,118,0.15)')}>Auto-matched</span>}
-                  {f.fieldType && f.fieldType !== 'text' && (
-                    <span style={badgeStyle('var(--accent-cyan)', 'rgba(0,242,254,0.15)')}>{f.fieldType}</span>
-                  )}
-                </div>
-              </div>
-
-              {/* Render appropriate input based on fieldType */}
-              {(f.fieldType === 'radio' || f.fieldType === 'dropdown') && f.options ? (
-                <select
-                  value={f.value}
-                  onChange={(e) => handleFieldChange(i, e.target.value)}
-                  style={selectStyle}
-                >
-                  <option value="">— Select —</option>
-                  {f.options.map((opt, oi) => (
-                    <option key={oi} value={opt}>{opt}</option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  className="prompt-input"
-                  style={{ width: '100%', padding: '0.55rem 0.8rem', fontSize: '0.88rem' }}
-                  value={f.value}
-                  onChange={(e) => handleFieldChange(i, e.target.value)}
-                />
-              )}
+        {/* Scrollable Form Body */}
+        <div style={{ flex: 1, overflowY: 'auto', paddingRight: '0.5rem', marginBottom: '1rem' }}>
+          {/* Auto-filled Fields */}
+          <div style={{ marginBottom: '1.2rem' }}>
+            <div style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--accent-cyan)', marginBottom: '0.6rem' }}>
+              ✅ Auto-populated Fields ({fields.length}):
             </div>
-          ))}
-        </div>
-
-        {/* Flagged Fields - User Must Fill */}
-        {flagged_fields && flagged_fields.length > 0 && (
-          <div style={{ background: 'rgba(255, 152, 0, 0.08)', border: '1px solid rgba(255, 152, 0, 0.4)', padding: '0.86rem 1rem', borderRadius: '10px', marginBottom: '1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600, marginBottom: '0.6rem', color: '#ff9800' }}>
-              <Edit3 size={16} />
-              <span>⚠ {flagged_fields.length} Fields Need Your Input:</span>
-            </div>
-
-            {flagged_fields.filter(f => !f.is_file).map((f, i) => (
-              <div key={i} style={{ marginBottom: '0.7rem' }}>
-                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.3rem' }}>
-                  {f.field_label}
-                  {f.fieldType && f.fieldType !== 'text' && (
-                    <span style={{ ...badgeStyle('#ff9800', 'rgba(255,152,0,0.15)'), marginLeft: '0.5rem' }}>{f.fieldType}</span>
-                  )}
-                </div>
-
-                {/* Radio / Dropdown — render as select */}
-                {(f.fieldType === 'radio' || f.fieldType === 'dropdown') && f.options ? (
-                  <select
-                    value={userAnswers[i] || ''}
-                    onChange={(e) => handleFlaggedChange(i, e.target.value)}
-                    style={selectStyle}
-                  >
-                    <option value="">— Please select —</option>
-                    {f.options.map((opt, oi) => (
-                      <option key={oi} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                ) : f.fieldType === 'checkbox' && f.options ? (
-                  /* Checkbox — render as checkboxes */
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.3rem' }}>
-                    {f.options.map((opt, oi) => {
-                      const isChecked = Array.isArray(userAnswers[i]) && userAnswers[i].includes(opt);
-                      return (
-                        <label
-                          key={oi}
+            {fields.map((f, i) => {
+              const isLongText = (f.value && f.value.length > 60) || f.is_ai_generated;
+              return (
+                <div key={i} className="review-field-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.3rem', padding: '0.5rem 0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '0.85rem' }}>
+                    <span className="review-label" style={{ fontWeight: 600, color: 'var(--text-muted)' }}>{f.field_label}:</span>
+                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                      {f.is_ai_generated && (
+                        <span style={badgeStyle('var(--accent-purple)', 'rgba(127,0,255,0.2)')}>
+                          <Sparkles size={11} /> {f.ai_company ? `${f.ai_company} Context` : 'AI Generated'}
+                        </span>
+                      )}
+                      {f.is_auto_matched && <span style={badgeStyle('var(--accent-emerald)', 'rgba(0,230,118,0.15)')}>Auto-matched</span>}
+                      {f.fieldType && f.fieldType !== 'text' && (
+                        <span style={badgeStyle('var(--accent-cyan)', 'rgba(0,242,254,0.15)')}>{f.fieldType}</span>
+                      )}
+                      {/* Re-generate button for long text / AI answers */}
+                      {isLongText && (
+                        <button
+                          type="button"
+                          onClick={() => handleRegenerateAI(i, f.field_label)}
+                          disabled={generatingFieldIdx === i}
                           style={{
-                            display: 'flex', alignItems: 'center', gap: '0.3rem',
-                            padding: '0.35rem 0.7rem', borderRadius: '6px', cursor: 'pointer',
-                            fontSize: '0.84rem', fontWeight: 500,
-                            background: isChecked ? 'rgba(0,230,118,0.15)' : 'rgba(255,255,255,0.04)',
-                            border: isChecked ? '1px solid var(--accent-emerald)' : '1px solid var(--border-color)',
-                            color: isChecked ? 'var(--accent-emerald)' : 'var(--text-muted)',
-                            transition: 'all 0.15s ease'
+                            background: 'transparent',
+                            border: '1px solid rgba(127,0,255,0.4)',
+                            color: 'var(--accent-purple)',
+                            fontSize: '0.72rem',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.2rem'
                           }}
                         >
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => handleCheckboxToggle(i, opt)}
-                            style={{ accentColor: 'var(--accent-emerald)' }}
-                          />
-                          {opt}
-                        </label>
-                      );
-                    })}
+                          <RefreshCw size={10} className={generatingFieldIdx === i ? 'animate-spin' : ''} />
+                          {generatingFieldIdx === i ? 'Synthesizing...' : 'Re-generate'}
+                        </button>
+                      )}
+                    </div>
                   </div>
-                ) : (
-                  /* Text — render as text input */
-                  <input
-                    placeholder={f.reason || 'Enter your answer...'}
-                    value={userAnswers[i] || ''}
-                    onChange={(e) => handleFlaggedChange(i, e.target.value)}
-                    style={inputStyle}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-        )}
 
-        <div className="modal-actions">
+                  {(f.fieldType === 'radio' || f.fieldType === 'dropdown') && f.options ? (
+                    <select
+                      value={f.value}
+                      onChange={(e) => handleFieldChange(i, e.target.value)}
+                      style={selectStyle}
+                    >
+                      <option value="">— Select —</option>
+                      {f.options.map((opt, oi) => (
+                        <option key={oi} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  ) : isLongText ? (
+                    <textarea
+                      className="prompt-input"
+                      rows={3}
+                      style={{ width: '100%', padding: '0.55rem 0.8rem', fontSize: '0.88rem', resize: 'vertical' }}
+                      value={f.value}
+                      onChange={(e) => handleFieldChange(i, e.target.value)}
+                    />
+                  ) : (
+                    <input
+                      className="prompt-input"
+                      style={{ width: '100%', padding: '0.55rem 0.8rem', fontSize: '0.88rem' }}
+                      value={f.value}
+                      onChange={(e) => handleFieldChange(i, e.target.value)}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Flagged Fields - User Input Required */}
+          {flagged_fields && flagged_fields.length > 0 && (
+            <div style={{ background: 'rgba(255, 152, 0, 0.08)', border: '1px solid rgba(255, 152, 0, 0.4)', padding: '0.86rem 1rem', borderRadius: '10px', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600, marginBottom: '0.6rem', color: '#ff9800' }}>
+                <Edit3 size={16} />
+                <span>⚠ {flagged_fields.length} Fields Need Your Input:</span>
+              </div>
+
+              {flagged_fields.filter(f => !f.is_file).map((f, i) => (
+                <div key={i} style={{ marginBottom: '0.8rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                      {f.field_label}
+                      {f.fieldType && f.fieldType !== 'text' && (
+                        <span style={{ ...badgeStyle('#ff9800', 'rgba(255,152,0,0.15)'), marginLeft: '0.5rem' }}>{f.fieldType}</span>
+                      )}
+                    </div>
+                    {/* Instant AI Answer Generator Button for Flagged Questions */}
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateFlaggedAI(i, f.field_label)}
+                      disabled={generatingFieldIdx === `flag_${i}`}
+                      style={{
+                        background: 'rgba(127,0,255,0.15)',
+                        border: '1px solid var(--accent-purple)',
+                        color: 'var(--accent-purple)',
+                        fontSize: '0.74rem',
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.3rem',
+                        fontWeight: 600
+                      }}
+                    >
+                      <Sparkles size={11} />
+                      {generatingFieldIdx === `flag_${i}` ? 'Generating...' : '✨ Generate with AI'}
+                    </button>
+                  </div>
+
+                  {(f.fieldType === 'radio' || f.fieldType === 'dropdown') && f.options ? (
+                    <select
+                      value={userAnswers[i] || ''}
+                      onChange={(e) => handleFlaggedChange(i, e.target.value)}
+                      style={selectStyle}
+                    >
+                      <option value="">— Please select —</option>
+                      {f.options.map((opt, oi) => (
+                        <option key={oi} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  ) : f.fieldType === 'checkbox' && f.options ? (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.3rem' }}>
+                      {f.options.map((opt, oi) => {
+                        const isChecked = Array.isArray(userAnswers[i]) && userAnswers[i].includes(opt);
+                        return (
+                          <label
+                            key={oi}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '0.3rem',
+                              padding: '0.35rem 0.7rem', borderRadius: '6px', cursor: 'pointer',
+                              fontSize: '0.84rem', fontWeight: 500,
+                              background: isChecked ? 'rgba(0,230,118,0.15)' : 'rgba(255,255,255,0.04)',
+                              border: isChecked ? '1px solid var(--accent-emerald)' : '1px solid var(--border-color)',
+                              color: isChecked ? 'var(--accent-emerald)' : 'var(--text-muted)',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => handleCheckboxToggle(i, opt)}
+                              style={{ accentColor: 'var(--accent-emerald)' }}
+                            />
+                            {opt}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <textarea
+                      rows={2}
+                      className="prompt-input"
+                      placeholder={f.reason || 'Enter answer or click ✨ Generate with AI above...'}
+                      value={userAnswers[i] || ''}
+                      onChange={(e) => handleFlaggedChange(i, e.target.value)}
+                      style={{ ...inputStyle, resize: 'vertical' }}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="modal-actions" style={{ paddingTop: '0.6rem', borderTop: '1px solid var(--border-color)' }}>
           <button className="btn-secondary" onClick={() => onReject(action_id)}>
             <X size={16} style={{ marginRight: '0.4rem' }} /> Cancel
           </button>

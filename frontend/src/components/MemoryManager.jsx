@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Database, User, Briefcase, GraduationCap, Link as LinkIcon, Save, FileUp, CheckCircle } from 'lucide-react';
+import { Database, User, Briefcase, GraduationCap, Link as LinkIcon, Save, FileUp, Sparkles, FileText } from 'lucide-react';
 
 export default function MemoryManager({ profile, onSave }) {
   const [memoryData, setMemoryData] = useState(profile || {});
@@ -53,47 +53,47 @@ export default function MemoryManager({ profile, onSave }) {
   };
 
   return (
-    <div className="glass-panel" style={{ padding: '1.5rem' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.2rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-color)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontFamily: 'var(--font-heading)', fontWeight: 600, fontSize: '1.1rem' }}>
-          <Database size={20} color="#7f00ff" />
+    <div className="glass-panel" style={{ padding: '1.2rem', maxHeight: '85vh', overflowY: 'auto' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', paddingBottom: '0.6rem', borderBottom: '1px solid var(--border-color)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontFamily: 'var(--font-heading)', fontWeight: 600, fontSize: '1.05rem' }}>
+          <Database size={18} color="#7f00ff" />
           <span>User Memory Subsystem</span>
         </div>
         {savedStatus && (
-          <span style={{ fontSize: '0.8rem', color: 'var(--accent-emerald)', fontWeight: 600 }}>{savedStatus}</span>
+          <span style={{ fontSize: '0.78rem', color: 'var(--accent-emerald)', fontWeight: 600 }}>{savedStatus}</span>
         )}
       </div>
 
       {/* Document Upload Button */}
-      <div style={{ background: 'rgba(127,0,255,0.08)', border: '1px dashed var(--accent-purple)', padding: '0.9rem', borderRadius: '10px', marginBottom: '1.2rem', textAlign: 'center' }}>
-        <label style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-purple)', fontWeight: 600, fontSize: '0.85rem' }}>
-          <FileUp size={20} />
-          <span>Ingest Resume / Doc to Context</span>
+      <div style={{ background: 'rgba(127,0,255,0.08)', border: '1px dashed var(--accent-purple)', padding: '0.8rem', borderRadius: '10px', marginBottom: '1rem', textAlign: 'center' }}>
+        <label style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem', color: 'var(--accent-purple)', fontWeight: 600, fontSize: '0.82rem' }}>
+          <FileUp size={18} />
+          <span>Ingest Resume / Document to Vector Memory</span>
           <input type="file" accept=".pdf,.txt,.doc,.docx" onChange={handleFileUpload} style={{ display: 'none' }} />
         </label>
         {uploadStatus && (
-          <div style={{ fontSize: '0.78rem', color: 'var(--accent-emerald)', marginTop: '0.4rem', fontWeight: 500 }}>
+          <div style={{ fontSize: '0.76rem', color: 'var(--accent-emerald)', marginTop: '0.3rem', fontWeight: 500 }}>
             {uploadStatus}
           </div>
         )}
       </div>
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', fontSize: '0.88rem' }}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem', fontSize: '0.86rem' }}>
         {/* Personal Details */}
         <div>
-          <div style={{ color: 'var(--accent-cyan)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
-            <User size={16} /> Personal Details
+          <div style={{ color: 'var(--accent-cyan)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.3rem' }}>
+            <User size={15} /> Personal Details
           </div>
           <input
             className="prompt-input"
-            style={{ width: '100%', marginBottom: '0.4rem' }}
+            style={{ width: '100%', marginBottom: '0.35rem' }}
             value={memoryData.personal?.full_name || ''}
             onChange={(e) => handleChange('personal', 'full_name', e.target.value)}
             placeholder="Full Name"
           />
           <input
             className="prompt-input"
-            style={{ width: '100%', marginBottom: '0.4rem' }}
+            style={{ width: '100%', marginBottom: '0.35rem' }}
             value={memoryData.personal?.email_primary || ''}
             onChange={(e) => handleChange('personal', 'email_primary', e.target.value)}
             placeholder="Primary Email"
@@ -109,22 +109,22 @@ export default function MemoryManager({ profile, onSave }) {
 
         {/* Education & Experience */}
         <div>
-          <div style={{ color: 'var(--accent-purple)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
-            <GraduationCap size={16} /> Education & Experience
+          <div style={{ color: 'var(--accent-purple)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.3rem' }}>
+            <GraduationCap size={15} /> Education & Experience
           </div>
           <input
             className="prompt-input"
-            style={{ width: '100%', marginBottom: '0.4rem' }}
+            style={{ width: '100%', marginBottom: '0.35rem' }}
             value={memoryData.education?.university || ''}
             onChange={(e) => handleChange('education', 'university', e.target.value)}
             placeholder="University / College"
           />
           <input
             className="prompt-input"
-            style={{ width: '100%', marginBottom: '0.4rem' }}
+            style={{ width: '100%', marginBottom: '0.35rem' }}
             value={memoryData.education?.degree || ''}
             onChange={(e) => handleChange('education', 'degree', e.target.value)}
-            placeholder="Degree"
+            placeholder="Degree (e.g. B.E. Computer Engineering)"
           />
           <input
             className="prompt-input"
@@ -135,14 +135,37 @@ export default function MemoryManager({ profile, onSave }) {
           />
         </div>
 
+        {/* Extra Context & Career Notes */}
+        <div>
+          <div style={{ color: 'var(--accent-emerald)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.3rem' }}>
+            <Sparkles size={15} /> Extra Career Context & Notes (for AI answers)
+          </div>
+          <textarea
+            className="prompt-input"
+            rows={3}
+            style={{ width: '100%', resize: 'vertical', fontSize: '0.84rem', lineHeight: 1.4, marginBottom: '0.35rem' }}
+            value={memoryData.extra_context?.career_narrative || ''}
+            onChange={(e) => handleChange('extra_context', 'career_narrative', e.target.value)}
+            placeholder="Career narrative / background summary..."
+          />
+          <textarea
+            className="prompt-input"
+            rows={2}
+            style={{ width: '100%', resize: 'vertical', fontSize: '0.84rem', lineHeight: 1.4 }}
+            value={memoryData.extra_context?.custom_user_notes || ''}
+            onChange={(e) => handleChange('extra_context', 'custom_user_notes', e.target.value)}
+            placeholder="Extra notes (e.g. target roles, leadership stories, work style)..."
+          />
+        </div>
+
         {/* Social Links */}
         <div>
-          <div style={{ color: 'var(--accent-amber)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
-            <LinkIcon size={16} /> Social Links
+          <div style={{ color: 'var(--accent-amber)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.3rem' }}>
+            <LinkIcon size={15} /> Social Links & Portfolio
           </div>
           <input
             className="prompt-input"
-            style={{ width: '100%', marginBottom: '0.4rem' }}
+            style={{ width: '100%', marginBottom: '0.35rem' }}
             value={memoryData.links?.github || ''}
             onChange={(e) => handleChange('links', 'github', e.target.value)}
             placeholder="GitHub URL (e.g. https://github.com/Dev22mehta17)"
@@ -156,8 +179,8 @@ export default function MemoryManager({ profile, onSave }) {
           />
         </div>
 
-        <button type="submit" className="action-btn" style={{ width: '100%', justifyContent: 'center', marginTop: '0.5rem', padding: '0.7rem' }}>
-          <Save size={16} /> Save Memory Context
+        <button type="submit" className="action-btn" style={{ width: '100%', justifyContent: 'center', marginTop: '0.4rem', padding: '0.65rem' }}>
+          <Save size={15} /> Save Memory Context
         </button>
       </form>
     </div>

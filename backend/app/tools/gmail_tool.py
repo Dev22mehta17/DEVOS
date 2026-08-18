@@ -1,26 +1,166 @@
+import os
 import logging
 import uuid
 import asyncio
-from typing import Dict, Any
+from typing import Dict, Any, Optional, List
 from app.tools.browser_tool import browser_tool
+from app.core.memory_engine import memory_engine
 from app.core.permission_engine import permission_engine
+from app.tools.file_tool import file_tool
 
 logger = logging.getLogger(__name__)
 
 
 class GmailTool:
     @staticmethod
-    async def create_draft(recipient: str, subject: str, body: str) -> Dict[str, Any]:
-        """Navigates to Gmail and stages draft for HITL approval."""
+    def get_social_signature() -> str:
+        """Generates a clean professional email signature with social links."""
+        p = memory_engine.profile_data
+        name = p.get("personal", {}).get("full_name", "Dev Mehta")
+        role = p.get("professional", {}).get("current_role", "Software Engineer")
+        phone = p.get("personal", {}).get("phone", "")
+        links = p.get("links", {})
+        
+        sig_lines = [
+            f"\n\nBest regards,\n{name}",
+            f"{role}" if role else "",
+            f"Phone: {phone}" if phone else "",
+            f"LinkedIn: {links.get('linkedin', '')}" if links.get('linkedin') else "",
+            f"GitHub: {links.get('github', '')}" if links.get('github') else "",
+            f"Portfolio: {links.get('portfolio', '')}" if links.get('portfolio') else "",
+        ]
+        return "\n".join([l for l in sig_lines if l])
+
+    @staticmethod
+    async def create_draft(recipient: str, subject: str, body: str, attach_resume: bool = False) -> Dict[str, Any]:
+        """Creates a fresh compose draft with optional resume attachment and signature."""
         action_id = f"email_{uuid.uuid4().hex[:8]}"
 
-        nav_result = await browser_tool.navigate("https://mail.google.com")
+        # Append signature if not already present
+        sig = GmailTool.get_social_signature()
+        if "Best regards" not in body and "Best," not in body:
+            body = body + sig
+
+        attached_file = None
+        if attach_resume:
+            attached_file = memory_engine.profile_data.get("documents", {}).get("active_resume_path") or file_tool.get_best_resume_path()
 
         draft_payload = {
             "recipient": recipient,
             "subject": subject,
             "body": body,
             "action_id": action_id,
+            "action_kind": "COMPOSE",
+            "attached_file": attached_file,
+            "account": "Primary Chrome Logged-in Google Account"
+        }
+
+        perm_check = permission_engine.check_action(
+            action_id=action_id,
+            action_type="compose_email",
+            payload=draft_payload
+        )
+
+        return {
+            "status": "DRAFT_READY",
+            "action_id": action_id,
+            "payload": draft_payload,
+            "permission": perm_check
+        }
+
+    @staticmethod
+    async def search_and_read_thread(query: str) -> Dict[str, Any]:
+        """Searches Gmail for emails matching a query and extracts details of the latest thread."""
+        if not browser_tool.context:
+            await browser_tool.initialize()
+
+        page = None
+        try:
+            page = await browser_tool.context.new_page()
+            encoded_query = query.replace(" ", "+")
+            search_url = f"https://mail.google.com/mail/u/0/#search/{encoded_query}"
+            logger.info(f"[Gmail] Searching emails: {search_url}")
+
+            await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
+            await asyncio.sleep(4.0)
+
+            # Extract list of search result email rows
+            thread_info = await page.evaluate("""() => {
+                const rows = document.querySelectorAll('tr.zA, div[role="main"] tr');
+                if (rows.length === 0) return null;
+
+                const firstRow = rows[0];
+                const senderEl = firstRow.querySelector('.zF, .yW span, .bA4 span');
+                const subjectEl = firstRow.querySelector('.bog span, .y6 span');
+                const snippetEl = firstRow.querySelector('.y2');
+                const dateEl = firstRow.querySelector('.xW span, .xY');
+
+                return {
+                    sender: senderEl ? senderEl.innerText.trim() : 'Unknown Sender',
+                    subject: subjectEl ? subjectEl.innerText.trim() : 'No Subject',
+                    snippet: snippetEl ? snippetEl.innerText.trim() : '',
+                    date: dateEl ? dateEl.innerText.trim() : ''
+                };
+            }""")
+
+            await page.close()
+
+            if thread_info:
+                logger.info(f"[Gmail] Found email thread: from='{thread_info['sender']}', subject='{thread_info['subject']}'")
+                return {"status": "SUCCESS", "thread": thread_info}
+            else:
+                logger.warning(f"[Gmail] No emails found for query: '{query}'")
+                return {"status": "NOT_FOUND", "message": f"No emails found matching query '{query}'."}
+
+        except Exception as e:
+            logger.error(f"[Gmail] Error searching emails: {e}")
+            if page:
+                try:
+                    await page.close()
+                except Exception:
+                    pass
+            return {"status": "ERROR", "message": str(e)}
+
+    @staticmethod
+    async def create_reply_draft(query: str, reply_intent: str = "confirm availability", attach_resume: bool = False) -> Dict[str, Any]:
+        """Finds matching email thread and drafts a context-aware reply for user approval."""
+        action_id = f"email_{uuid.uuid4().hex[:8]}"
+
+        # Step 1: Search email
+        search_res = await GmailTool.search_and_read_thread(query)
+        thread = search_res.get("thread", {})
+
+        sender = thread.get("sender", "Recruiter / Hiring Team")
+        subject = thread.get("subject", "Interview / Opportunity")
+        snippet = thread.get("snippet", "")
+
+        # Format recipient (extract email or use sender name)
+        reply_subj = subject if subject.lower().startswith("re:") else f"Re: {subject}"
+
+        # Generate intelligent reply body
+        name = memory_engine.profile_data.get("personal", {}).get("full_name", "Dev Mehta")
+        sig = GmailTool.get_social_signature()
+
+        if "availab" in reply_intent.lower() or "tomorrow" in reply_intent.lower():
+            body = f"Hi {sender.split()[0] if sender else 'there'},\n\nThank you for reaching out! I would be delighted to connect. I am available tomorrow after 3:00 PM IST (or any time this week that works best for you).\n\nPlease let me know if you would like me to share any additional details.\n{sig}"
+        elif "interest" in reply_intent.lower() or "apply" in reply_intent.lower():
+            body = f"Hi {sender.split()[0] if sender else 'there'},\n\nThank you for reaching out regarding the opportunity! I am very interested in learning more about the role and how my background in backend systems and software engineering can contribute to your team.\n\nI have attached my updated resume for your review.\n{sig}"
+            attach_resume = True
+        else:
+            body = f"Hi {sender.split()[0] if sender else 'there'},\n\nThank you for your message. {reply_intent.capitalize()}.\n\nLooking forward to hearing from you!\n{sig}"
+
+        attached_file = None
+        if attach_resume:
+            attached_file = memory_engine.profile_data.get("documents", {}).get("active_resume_path") or file_tool.get_best_resume_path()
+
+        draft_payload = {
+            "recipient": sender,
+            "subject": reply_subj,
+            "body": body,
+            "action_id": action_id,
+            "action_kind": "REPLY",
+            "original_snippet": snippet,
+            "attached_file": attached_file,
             "account": "Primary Chrome Logged-in Google Account"
         }
 
@@ -35,12 +175,50 @@ class GmailTool:
             "action_id": action_id,
             "payload": draft_payload,
             "permission": perm_check,
-            "browser_info": nav_result
+            "thread_found": bool(thread)
+        }
+
+    @staticmethod
+    async def create_forward_draft(query: str, forward_to: str, explanation: str = "") -> Dict[str, Any]:
+        """Finds matching email thread and drafts a forward message for user approval."""
+        action_id = f"email_{uuid.uuid4().hex[:8]}"
+
+        search_res = await GmailTool.search_and_read_thread(query)
+        thread = search_res.get("thread", {})
+
+        subject = thread.get("subject", "Forwarded Message")
+        fwd_subj = subject if subject.lower().startswith("fwd:") else f"Fwd: {subject}"
+        snippet = thread.get("snippet", "")
+        sig = GmailTool.get_social_signature()
+
+        body = f"Hi,\n\n{explanation or 'Forwarding this email for your review.'}\n\n--- Forwarded message ---\nFrom: {thread.get('sender', '')}\nSubject: {subject}\n\n{snippet}\n{sig}"
+
+        draft_payload = {
+            "recipient": forward_to,
+            "subject": fwd_subj,
+            "body": body,
+            "action_id": action_id,
+            "action_kind": "FORWARD",
+            "original_snippet": snippet,
+            "account": "Primary Chrome Logged-in Google Account"
+        }
+
+        perm_check = permission_engine.check_action(
+            action_id=action_id,
+            action_type="compose_email",
+            payload=draft_payload
+        )
+
+        return {
+            "status": "DRAFT_READY",
+            "action_id": action_id,
+            "payload": draft_payload,
+            "permission": perm_check
         }
 
     @staticmethod
     async def send_draft(action_id: str, payload: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Opens Gmail compose, fills To/Subject/Body ON the browser, then clicks Send."""
+        """Opens Gmail compose in Chrome, fills recipient, subject, body, attaches files, and sends."""
         approved = permission_engine.approve_action(action_id)
         if not approved:
             return {"status": "ERROR", "sent_on_chrome": False, "message": "Email send action was not approved."}
@@ -48,11 +226,12 @@ class GmailTool:
         recipient = payload.get("recipient", "") if payload else ""
         subject = payload.get("subject", "") if payload else ""
         body = payload.get("body", "") if payload else ""
+        attached_file = payload.get("attached_file") if payload else None
 
         if not recipient:
             return {"status": "ERROR", "sent_on_chrome": False, "message": "No recipient email address provided."}
 
-        logger.info(f"[Gmail] Starting real send: to={recipient}, subject={subject}")
+        logger.info(f"[Gmail] Starting send: to={recipient}, subject={subject}")
 
         if not browser_tool.context:
             logger.error("[Gmail] No browser context available")
@@ -60,21 +239,15 @@ class GmailTool:
 
         page = None
         try:
-            # Open a dedicated new tab for Gmail
             page = await browser_tool.context.new_page()
-            logger.info("[Gmail] Opened new tab for Gmail")
-
-            # Navigate — use domcontentloaded (Gmail never reaches networkidle)
             await page.goto("https://mail.google.com/mail/u/0/#inbox", wait_until="domcontentloaded", timeout=30000)
-            logger.info("[Gmail] Gmail page loaded (domcontentloaded)")
-            # Wait for Gmail UI to render
             await asyncio.sleep(4.0)
 
             # Step 1: Click Compose
             compose_clicked = False
             compose_selectors = [
-                'div.T-I.T-I-KE.L3',      # Gmail's actual Compose button class
-                'div[gh="cm"]',             # Gmail Compose attribute
+                'div.T-I.T-I-KE.L3',
+                'div[gh="cm"]',
                 '[aria-label="Compose"]',
             ]
             for sel in compose_selectors:
@@ -83,16 +256,13 @@ class GmailTool:
                     if btn:
                         await btn.click()
                         compose_clicked = True
-                        logger.info(f"[Gmail] Clicked Compose: {sel}")
                         break
                 except Exception:
                     continue
 
             if not compose_clicked:
-                # Fallback: press 'c' keyboard shortcut which opens Compose in Gmail
                 await page.keyboard.press("c")
                 compose_clicked = True
-                logger.info("[Gmail] Opened Compose via 'c' keyboard shortcut")
 
             await asyncio.sleep(2.0)
 
@@ -115,28 +285,23 @@ class GmailTool:
                         await asyncio.sleep(0.5)
                         await page.keyboard.press("Tab")
                         to_filled = True
-                        logger.info(f"[Gmail] Filled To: {recipient}")
                         break
                 except Exception:
                     continue
 
             if not to_filled:
-                logger.error("[Gmail] Could not find To field")
                 await page.close()
                 return {"status": "ERROR", "sent_on_chrome": False, "message": "Could not find To field on Gmail"}
 
             await asyncio.sleep(0.8)
 
             # Step 3: Fill Subject
-            subject_filled = False
             for sel in ['input[name="subjectbox"]', 'input[aria-label="Subject"]']:
                 try:
                     subj = await page.wait_for_selector(sel, timeout=3000)
                     if subj:
                         await subj.click()
                         await subj.fill(subject)
-                        subject_filled = True
-                        logger.info(f"[Gmail] Filled Subject: {subject}")
                         break
                 except Exception:
                     continue
@@ -144,27 +309,39 @@ class GmailTool:
             await asyncio.sleep(0.5)
 
             # Step 4: Fill Body
-            body_filled = False
             for sel in ['div[aria-label="Message Body"]', 'div[role="textbox"]', 'div[contenteditable="true"]']:
                 try:
                     body_el = await page.wait_for_selector(sel, timeout=3000)
                     if body_el:
                         await body_el.click()
-                        await page.keyboard.type(body, delay=15)
-                        body_filled = True
-                        logger.info("[Gmail] Filled Body")
+                        await page.keyboard.type(body, delay=10)
                         break
                 except Exception:
                     continue
 
             await asyncio.sleep(1.0)
 
-            # Step 5: Click Send — try button first, then keyboard shortcut
+            # Step 5: Attach file if requested
+            if attached_file and os.path.exists(attached_file):
+                logger.info(f"[Gmail] Attaching file to email: {attached_file}")
+                try:
+                    attach_btn = await page.query_selector('div[command="Files"], div[aria-label*="Attach files"], div[data-tooltip*="Attach files"]')
+                    if attach_btn:
+                        async with page.expect_file_chooser(timeout=8000) as fc_info:
+                            await attach_btn.click()
+                        file_chooser = await fc_info.value
+                        await file_chooser.set_files(attached_file)
+                        logger.info("[Gmail] ✅ File attached successfully")
+                        await asyncio.sleep(4.0)  # Wait for upload
+                except Exception as attach_err:
+                    logger.warning(f"[Gmail] File attach error: {attach_err}")
+
+            # Step 6: Click Send
             send_clicked = False
             send_selectors = [
                 'div[aria-label*="Send"][role="button"]',
                 'div[data-tooltip*="Send"][role="button"]',
-                'div.T-I.J-J5-Ji.aoO.v7.T-I-atl.L3',  # Gmail Send button class
+                'div.T-I.J-J5-Ji.aoO.v7.T-I-atl.L3',
             ]
             for sel in send_selectors:
                 try:
@@ -172,34 +349,25 @@ class GmailTool:
                     if send_btn:
                         await send_btn.click()
                         send_clicked = True
-                        logger.info(f"[Gmail] Clicked Send: {sel}")
                         break
                 except Exception:
                     continue
 
             if not send_clicked:
-                # Fallback: Cmd+Enter (Mac) / Ctrl+Enter (Windows)
                 try:
                     await page.keyboard.press("Meta+Enter")
                     send_clicked = True
-                    logger.info("[Gmail] Sent via Cmd+Enter")
                 except Exception:
                     pass
 
             await asyncio.sleep(3.0)
-
-            if send_clicked:
-                logger.info(f"[Gmail] ✅ Email to {recipient} sent successfully")
-            else:
-                logger.error("[Gmail] Could not send email")
-
             await page.close()
 
             return {
                 "status": "SENT" if send_clicked else "ERROR",
                 "action_id": action_id,
                 "sent_on_chrome": send_clicked,
-                "message": f"Email sent to {recipient} via Gmail." if send_clicked else "Could not click Send"
+                "message": f"Email to {recipient} sent successfully." if send_clicked else "Could not click Send"
             }
 
         except Exception as e:
