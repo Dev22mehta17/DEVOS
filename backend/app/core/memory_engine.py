@@ -158,15 +158,17 @@ class MemoryEngine:
             return self.profile_data.get("personal", {}).get("email_primary")
         if any(k in field_lower for k in ["phone", "mobile", "contact number"]):
             return self.profile_data.get("personal", {}).get("phone")
-        if "location" in field_lower or "address" in field_lower:
+        if any(k in field_lower for k in ["location", "address", "city", "state"]):
             return self.profile_data.get("personal", {}).get("location")
+        if "gender" in field_lower:
+            return self.profile_data.get("personal", {}).get("gender")
             
         # Education
         if any(k in field_lower for k in ["university", "college", "school", "institution"]):
             return self.profile_data.get("education", {}).get("university")
         if any(k in field_lower for k in ["degree", "major", "qualification"]):
             return self.profile_data.get("education", {}).get("degree")
-        if any(k in field_lower for k in ["graduation", "grad year", "passing year"]):
+        if any(k in field_lower for k in ["graduation", "grad year", "passing year", "pass out", "passout", "batch", "year"]):
             return self.profile_data.get("education", {}).get("graduation_year")
         if "gpa" in field_lower or "cgpa" in field_lower:
             return self.profile_data.get("education", {}).get("gpa")
@@ -180,9 +182,9 @@ class MemoryEngine:
             return self.profile_data.get("links", {}).get("portfolio")
 
         # Professional
-        if "experience" in field_lower or "role" in field_lower:
+        if any(k in field_lower for k in ["experience", "role", "position", "designation"]):
             return self.profile_data.get("professional", {}).get("current_role")
-        if "company" in field_lower or "current employer" in field_lower:
+        if any(k in field_lower for k in ["company", "current employer", "organization"]):
             return self.profile_data.get("professional", {}).get("current_company")
         if "notice" in field_lower:
             return self.profile_data.get("professional", {}).get("notice_period")
@@ -190,6 +192,114 @@ class MemoryEngine:
             return self.profile_data.get("professional", {}).get("expected_salary")
         if "authorized" in field_lower or "sponsorship" in field_lower:
             return self.profile_data.get("personal", {}).get("work_authorization")
+        if any(k in field_lower for k in ["skill", "technologies", "tech stack"]):
+            skills = self.profile_data.get("professional", {}).get("skills", [])
+            return ", ".join(skills) if skills else None
+
+        # Open-ended / Comments
+        if any(k in field_lower for k in ["comment", "anything else", "additional", "message", "note"]):
+            return ""  # Return empty — let the user fill this
+
+        return None
+
+    def match_option(self, question_label: str, options: List[str]) -> Optional[Dict[str, Any]]:
+        """Intelligently matches a multiple-choice question's options against profile data.
+        
+        Returns {"matched_option": "2026", "confidence": "high"} or None if unsure.
+        """
+        q_lower = question_label.lower()
+        
+        # --- Year / Pass out / Graduation ---
+        if any(k in q_lower for k in ["year", "pass out", "passout", "graduation", "batch", "graduating"]):
+            grad_year = self.profile_data.get("education", {}).get("graduation_year", "")
+            if grad_year:
+                for opt in options:
+                    if grad_year in opt or opt.strip() == grad_year:
+                        return {"matched_option": opt, "confidence": "high"}
+                # Fuzzy: check if any option contains the year
+                for opt in options:
+                    if any(c.isdigit() for c in opt) and grad_year in opt:
+                        return {"matched_option": opt, "confidence": "medium"}
+
+        # --- Gender ---
+        if "gender" in q_lower:
+            gender = self.profile_data.get("personal", {}).get("gender", "")
+            if gender:
+                for opt in options:
+                    if opt.lower().strip() == gender.lower() or gender.lower() in opt.lower():
+                        return {"matched_option": opt, "confidence": "high"}
+
+        # --- Experience level ---
+        if any(k in q_lower for k in ["experience", "years of experience", "experience level"]):
+            exp = self.profile_data.get("professional", {}).get("total_experience", "")
+            if exp:
+                # Try to match numeric years
+                import re
+                exp_num = re.search(r'(\d+)', exp)
+                if exp_num:
+                    exp_val = int(exp_num.group(1))
+                    for opt in options:
+                        opt_num = re.search(r'(\d+)', opt)
+                        if opt_num and int(opt_num.group(1)) == exp_val:
+                            return {"matched_option": opt, "confidence": "high"}
+                # Try fuzzy match
+                for opt in options:
+                    if any(k in opt.lower() for k in ["fresher", "0", "entry", "intern"]) and exp_val <= 1:
+                        return {"matched_option": opt, "confidence": "medium"}
+                    if "1" in opt and exp_val == 1:
+                        return {"matched_option": opt, "confidence": "medium"}
+
+        # --- Work authorization / Visa ---
+        if any(k in q_lower for k in ["authorized", "visa", "work permit", "sponsorship", "legally"]):
+            auth = self.profile_data.get("personal", {}).get("work_authorization", "")
+            if auth:
+                for opt in options:
+                    if "yes" in opt.lower() and ("authorized" in auth.lower() or "yes" in auth.lower()):
+                        return {"matched_option": opt, "confidence": "high"}
+                    if "no" in opt.lower() and "not" in auth.lower():
+                        return {"matched_option": opt, "confidence": "high"}
+
+        # --- Education level ---
+        if any(k in q_lower for k in ["education", "highest degree", "qualification level"]):
+            degree = self.profile_data.get("education", {}).get("degree", "")
+            if degree:
+                for opt in options:
+                    ol = opt.lower()
+                    if any(k in ol for k in ["bachelor", "b.e", "b.tech", "undergraduate", "ug"]) and \
+                       any(k in degree.lower() for k in ["b.e", "b.tech", "bachelor"]):
+                        return {"matched_option": opt, "confidence": "high"}
+                    if any(k in ol for k in ["master", "m.tech", "m.s", "pg"]) and \
+                       any(k in degree.lower() for k in ["m.tech", "master", "m.s"]):
+                        return {"matched_option": opt, "confidence": "high"}
+
+        # --- Notice period ---
+        if "notice" in q_lower:
+            notice = self.profile_data.get("professional", {}).get("notice_period", "")
+            if notice:
+                for opt in options:
+                    if "immediate" in opt.lower() and "immediate" in notice.lower():
+                        return {"matched_option": opt, "confidence": "high"}
+                    if "15" in opt and "15" in notice:
+                        return {"matched_option": opt, "confidence": "high"}
+
+        # --- Generic: try semantic memory for best match ---
+        if self.collection:
+            try:
+                results = self.collection.query(query_texts=[question_label], n_results=1)
+                if results and results.get("documents", [[]])[0]:
+                    context = results["documents"][0][0].lower()
+                    best_match = None
+                    best_score = 0
+                    for opt in options:
+                        opt_words = opt.lower().split()
+                        score = sum(1 for w in opt_words if w in context)
+                        if score > best_score:
+                            best_score = score
+                            best_match = opt
+                    if best_match and best_score >= 1:
+                        return {"matched_option": best_match, "confidence": "low"}
+            except Exception:
+                pass
 
         return None
 
