@@ -289,19 +289,22 @@ class FormTool:
 
             elif ft == "radio" and val:
                 q_idx = f.get("questionIndex", 0)
-                success = await browser_tool.select_radio_option(q_idx, val)
-                logger.info(f"[FormTool] Selected radio '{val}' for '{f.get('field_label', '')}' -> {success}")
+                label = f.get("field_label", "")
+                success = await browser_tool.select_radio_option(q_idx, val, label)
+                logger.info(f"[FormTool] Selected radio '{val}' for '{label}' -> {success}")
 
             elif ft == "checkbox" and val:
                 q_idx = f.get("questionIndex", 0)
+                label = f.get("field_label", "")
                 selected_opts = [v.strip() for v in val.split(",")]
-                success = await browser_tool.select_checkbox_options(q_idx, selected_opts)
-                logger.info(f"[FormTool] Selected checkboxes {selected_opts} -> {success}")
+                success = await browser_tool.select_checkbox_options(q_idx, selected_opts, label)
+                logger.info(f"[FormTool] Selected checkboxes {selected_opts} for '{label}' -> {success}")
 
             elif ft == "dropdown" and val:
                 q_idx = f.get("questionIndex", 0)
-                success = await browser_tool.select_dropdown_option(q_idx, val)
-                logger.info(f"[FormTool] Selected dropdown '{val}' -> {success}")
+                label = f.get("field_label", "")
+                success = await browser_tool.select_dropdown_option(q_idx, val, label)
+                logger.info(f"[FormTool] Selected dropdown '{val}' for '{label}' -> {success}")
 
         await asyncio.sleep(1.0)
 

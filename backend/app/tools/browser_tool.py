@@ -78,12 +78,12 @@ class BrowserTool:
         return {"title": title, "url": url}
 
     async def inspect_inputs(self) -> List[Dict[str, Any]]:
-        """Scans DOM for ALL form field types: text, radio, checkbox, dropdown, file, specialized for Google Forms."""
+        """Scans DOM for ALL form field types: radio, checkbox, dropdown, file, text, specialized for Google Forms."""
         if not self.page:
             return []
         try:
             try:
-                await self.page.wait_for_selector('input[type="text"], textarea, div[role="heading"]', timeout=8000)
+                await self.page.wait_for_selector('div[role="listitem"], input, textarea, div[role="heading"]', timeout=8000)
             except Exception:
                 pass
 
@@ -94,8 +94,11 @@ class BrowserTool:
                 // Helper: get the question heading from a container
                 function getHeading(container) {
                     if (!container) return '';
-                    const headingEl = container.querySelector('div[role="heading"], .M7eMe, span.M7eMe');
-                    return headingEl ? headingEl.innerText.trim().split('\\n')[0] : '';
+                    const headingEl = container.querySelector('div[role="heading"], .M7eMe, span.M7eMe, .F9vfv');
+                    if (headingEl) {
+                        return headingEl.innerText.trim().split('\\n')[0].replace(/\\*$/, '').trim();
+                    }
+                    return '';
                 }
 
                 // Helper: check if required (has *)
@@ -110,37 +113,36 @@ class BrowserTool:
                     const heading = getHeading(block);
                     const required = isRequired(block);
 
-                    // 1. Text/Email/Tel inputs and textareas
-                    const textInputs = block.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"], input[type="number"], input[type="url"], input[type="date"], textarea');
-                    if (textInputs.length > 0) {
-                        textInputs.forEach((inp) => {
-                            results.push({
-                                id: inp.id || `input_${questionIndex}`,
-                                name: inp.name || '',
-                                type: inp.type || inp.tagName.toLowerCase() === 'textarea' ? 'textarea' : 'text',
-                                tagName: inp.tagName.toLowerCase(),
-                                placeholder: inp.placeholder || '',
-                                labelText: heading || inp.getAttribute('aria-label') || inp.placeholder || '',
-                                value: inp.value || '',
-                                required: required,
-                                questionIndex: questionIndex,
-                                fieldType: 'text'
-                            });
+                    // 1. Check for File Upload ("Add file" button) FIRST
+                    const fileBtn = Array.from(block.querySelectorAll('div[role="button"], span'))
+                        .find(el => el.innerText && el.innerText.trim().toLowerCase().includes('add file'));
+                    if (fileBtn) {
+                        results.push({
+                            id: `file_btn_${questionIndex}`,
+                            name: 'file_upload',
+                            type: 'file',
+                            tagName: 'button',
+                            labelText: heading || 'Resume / File Upload',
+                            required: required,
+                            questionIndex: questionIndex,
+                            fieldType: 'file'
                         });
                         questionIndex++;
                         return;
                     }
 
-                    // 2. Radio buttons (Google Forms: div[role="radiogroup"] > div[role="radio"])
+                    // 2. Check for Radio buttons (Google Forms: div[role="radiogroup"] > div[role="radio"]) FIRST
                     const radioGroup = block.querySelector('div[role="radiogroup"], fieldset[role="radiogroup"]');
                     if (radioGroup) {
                         const radios = radioGroup.querySelectorAll('div[role="radio"], label[role="radio"]');
                         const options = [];
                         let selectedOption = null;
                         radios.forEach((radio) => {
-                            const label = radio.getAttribute('data-value') || radio.innerText.trim();
+                            const label = radio.getAttribute('data-value') || 
+                                          radio.getAttribute('aria-label') || 
+                                          radio.innerText.trim();
                             const checked = radio.getAttribute('aria-checked') === 'true';
-                            if (label) options.push(label);
+                            if (label && !options.includes(label)) options.push(label);
                             if (checked) selectedOption = label;
                         });
                         if (options.length > 0) {
@@ -159,7 +161,7 @@ class BrowserTool:
                         }
                     }
 
-                    // 3. Checkboxes (Google Forms: div[role="group"] with div[role="checkbox"])
+                    // 3. Check for Checkboxes (Google Forms: div[role="group"] with div[role="checkbox"])
                     const checkboxes = block.querySelectorAll('div[role="checkbox"], label[role="checkbox"]');
                     if (checkboxes.length > 0) {
                         const options = [];
@@ -167,7 +169,7 @@ class BrowserTool:
                         checkboxes.forEach((cb) => {
                             const label = cb.getAttribute('data-answer-value') || cb.getAttribute('aria-label') || cb.innerText.trim();
                             const checked = cb.getAttribute('aria-checked') === 'true';
-                            if (label) {
+                            if (label && !options.includes(label)) {
                                 options.push(label);
                                 if (checked) selected.push(label);
                             }
@@ -188,7 +190,7 @@ class BrowserTool:
                         }
                     }
 
-                    // 4. Dropdown (Google Forms: div[role="listbox"] with div[role="option"])
+                    // 4. Check for Dropdown (Google Forms: div[role="listbox"] with div[role="option"])
                     const listbox = block.querySelector('div[role="listbox"]');
                     if (listbox) {
                         const optionEls = listbox.querySelectorAll('div[role="option"], span[role="option"]');
@@ -197,7 +199,7 @@ class BrowserTool:
                         optionEls.forEach((opt) => {
                             const label = opt.getAttribute('data-value') || opt.innerText.trim();
                             const isSelected = opt.getAttribute('aria-selected') === 'true';
-                            if (label && label !== 'Choose') options.push(label);
+                            if (label && label !== 'Choose' && !options.includes(label)) options.push(label);
                             if (isSelected && label !== 'Choose') selectedOption = label;
                         });
                         if (options.length > 0) {
@@ -216,19 +218,22 @@ class BrowserTool:
                         }
                     }
 
-                    // 5. File Upload ("Add file" button)
-                    const fileBtn = Array.from(block.querySelectorAll('div[role="button"], span'))
-                        .find(el => el.innerText && el.innerText.trim().toLowerCase().includes('add file'));
-                    if (fileBtn) {
-                        results.push({
-                            id: `file_btn_${questionIndex}`,
-                            name: 'file_upload',
-                            type: 'file',
-                            tagName: 'button',
-                            labelText: heading || 'Resume / File Upload',
-                            required: required,
-                            questionIndex: questionIndex,
-                            fieldType: 'file'
+                    // 5. Only if not radio/checkbox/dropdown/file, check for Text/Email/Tel/Textarea inputs
+                    const textInputs = block.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"], input[type="number"], input[type="url"], input[type="date"], textarea');
+                    if (textInputs.length > 0) {
+                        textInputs.forEach((inp) => {
+                            results.push({
+                                id: inp.id || `input_${questionIndex}`,
+                                name: inp.name || '',
+                                type: inp.tagName.toLowerCase() === 'textarea' ? 'textarea' : (inp.type || 'text'),
+                                tagName: inp.tagName.toLowerCase(),
+                                placeholder: inp.placeholder || '',
+                                labelText: heading || inp.getAttribute('aria-label') || inp.placeholder || '',
+                                value: inp.value || '',
+                                required: required,
+                                questionIndex: questionIndex,
+                                fieldType: 'text'
+                            });
                         });
                         questionIndex++;
                         return;
@@ -298,118 +303,150 @@ class BrowserTool:
             logger.error(f"Error filling input idx {idx}: {e}")
             return False
 
-    async def select_radio_option(self, question_index: int, option_text: str) -> bool:
-        """Clicks a radio button option in a Google Form by question index and option text."""
-        if not self.page:
+    async def select_radio_option(self, question_index: int, option_text: str, question_label: str = "") -> bool:
+        """Clicks a radio button option in a Google Form by question label or index."""
+        if not self.page or not option_text:
             return False
         try:
-            success = await self.page.evaluate("""([qIdx, optText]) => {
-                const blocks = document.querySelectorAll('div[role="listitem"]');
-                let radioBlockIdx = 0;
-                for (const block of blocks) {
-                    const radioGroup = block.querySelector('div[role="radiogroup"], fieldset[role="radiogroup"]');
-                    if (!radioGroup) continue;
-                    if (radioBlockIdx === qIdx) {
-                        const radios = radioGroup.querySelectorAll('div[role="radio"], label[role="radio"]');
-                        for (const radio of radios) {
-                            const label = (radio.getAttribute('data-value') || radio.innerText.trim()).toLowerCase();
-                            if (label === optText.toLowerCase() || label.includes(optText.toLowerCase())) {
-                                radio.click();
-                                return true;
-                            }
-                        }
-                        // Fallback: try partial match
-                        for (const radio of radios) {
-                            const label = (radio.getAttribute('data-value') || radio.innerText.trim()).toLowerCase();
-                            if (optText.toLowerCase().includes(label) || label.includes(optText.toLowerCase().substring(0, 4))) {
-                                radio.click();
-                                return true;
-                            }
-                        }
-                        return false;
+            success = await self.page.evaluate("""([qIdx, optText, qLabel]) => {
+                const optClean = (optText || '').toLowerCase().trim();
+                const labelClean = (qLabel || '').toLowerCase().trim();
+                const blocks = Array.from(document.querySelectorAll('div[role="listitem"]'));
+
+                // Find the target block by label match or by index
+                let targetBlock = null;
+                if (labelClean) {
+                    targetBlock = blocks.find(b => {
+                        const heading = b.querySelector('div[role="heading"], .M7eMe, span');
+                        return heading && heading.innerText.toLowerCase().includes(labelClean);
+                    });
+                }
+                if (!targetBlock && qIdx < blocks.length) {
+                    targetBlock = blocks[qIdx];
+                }
+
+                // If target block found, search within it
+                const searchRoot = targetBlock || document;
+                const radios = Array.from(searchRoot.querySelectorAll('div[role="radio"], label[role="radio"]'));
+
+                for (const radio of radios) {
+                    const rValue = (radio.getAttribute('data-value') || '').toLowerCase().trim();
+                    const rText = (radio.innerText || '').toLowerCase().trim();
+                    const rAria = (radio.getAttribute('aria-label') || '').toLowerCase().trim();
+
+                    if (rValue === optClean || rText === optClean || rAria === optClean ||
+                        rValue.includes(optClean) || rText.includes(optClean) || optClean.includes(rValue)) {
+                        radio.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        radio.click();
+                        // Dispatch mouse & change events
+                        radio.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+                        radio.dispatchEvent(new Event('change', { bubbles: true }));
+                        const parent = radio.parentElement;
+                        if (parent) parent.click();
+                        return true;
                     }
-                    radioBlockIdx++;
                 }
                 return false;
-            }""", [question_index, option_text])
+            }""", [question_index, option_text, question_label])
             if success:
-                logger.info(f"[Browser] Selected radio option '{option_text}' at question index {question_index}")
+                logger.info(f"[Browser] ✅ Selected radio option '{option_text}' for question '{question_label}' (idx {question_index})")
+            else:
+                logger.warning(f"[Browser] ❌ Failed to find radio option '{option_text}' for question '{question_label}'")
             return success
         except Exception as e:
             logger.error(f"Error selecting radio option: {e}")
             return False
 
-    async def select_checkbox_options(self, question_index: int, option_texts: List[str]) -> bool:
-        """Clicks multiple checkbox options in a Google Form by question index."""
-        if not self.page:
+    async def select_checkbox_options(self, question_index: int, option_texts: List[str], question_label: str = "") -> bool:
+        """Clicks multiple checkbox options in a Google Form by question label or index."""
+        if not self.page or not option_texts:
             return False
         try:
-            success = await self.page.evaluate("""([qIdx, optTexts]) => {
-                const blocks = document.querySelectorAll('div[role="listitem"]');
-                let cbBlockIdx = 0;
-                for (const block of blocks) {
-                    const checkboxes = block.querySelectorAll('div[role="checkbox"], label[role="checkbox"]');
-                    if (checkboxes.length === 0) continue;
-                    if (cbBlockIdx === qIdx) {
-                        let clicked = 0;
-                        for (const cb of checkboxes) {
-                            const label = (cb.getAttribute('data-answer-value') || cb.getAttribute('aria-label') || cb.innerText.trim()).toLowerCase();
-                            for (const opt of optTexts) {
-                                if (label === opt.toLowerCase() || label.includes(opt.toLowerCase())) {
-                                    if (cb.getAttribute('aria-checked') !== 'true') {
-                                        cb.click();
-                                    }
-                                    clicked++;
-                                    break;
-                                }
-                            }
-                        }
-                        return clicked > 0;
-                    }
-                    cbBlockIdx++;
+            success = await self.page.evaluate("""([qIdx, optTexts, qLabel]) => {
+                const labelClean = (qLabel || '').toLowerCase().trim();
+                const blocks = Array.from(document.querySelectorAll('div[role="listitem"]'));
+
+                let targetBlock = null;
+                if (labelClean) {
+                    targetBlock = blocks.find(b => {
+                        const heading = b.querySelector('div[role="heading"], .M7eMe, span');
+                        return heading && heading.innerText.toLowerCase().includes(labelClean);
+                    });
                 }
-                return false;
-            }""", [question_index, option_texts])
+                if (!targetBlock && qIdx < blocks.length) {
+                    targetBlock = blocks[qIdx];
+                }
+
+                const searchRoot = targetBlock || document;
+                const checkboxes = Array.from(searchRoot.querySelectorAll('div[role="checkbox"], label[role="checkbox"]'));
+                let clickedCount = 0;
+
+                for (const cb of checkboxes) {
+                    const cbValue = (cb.getAttribute('data-answer-value') || cb.getAttribute('aria-label') || cb.innerText || '').toLowerCase().trim();
+                    for (const opt of optTexts) {
+                        const targetOpt = opt.toLowerCase().trim();
+                        if (cbValue === targetOpt || cbValue.includes(targetOpt) || targetOpt.includes(cbValue)) {
+                            if (cb.getAttribute('aria-checked') !== 'true') {
+                                cb.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                cb.click();
+                                cb.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+                                cb.dispatchEvent(new Event('change', { bubbles: true }));
+                            }
+                            clickedCount++;
+                            break;
+                        }
+                    }
+                }
+                return clickedCount > 0;
+            }""", [question_index, option_texts, question_label])
             if success:
-                logger.info(f"[Browser] Selected checkbox options {option_texts} at question index {question_index}")
+                logger.info(f"[Browser] ✅ Selected checkbox options {option_texts} for question '{question_label}'")
             return success
         except Exception as e:
             logger.error(f"Error selecting checkbox options: {e}")
             return False
 
-    async def select_dropdown_option(self, question_index: int, option_text: str) -> bool:
+    async def select_dropdown_option(self, question_index: int, option_text: str, question_label: str = "") -> bool:
         """Opens a dropdown and selects an option in a Google Form."""
-        if not self.page:
+        if not self.page or not option_text:
             return False
         try:
-            # First, click the dropdown to open it
-            opened = await self.page.evaluate("""(qIdx) => {
-                const blocks = document.querySelectorAll('div[role="listitem"]');
-                let ddBlockIdx = 0;
-                for (const block of blocks) {
-                    const listbox = block.querySelector('div[role="listbox"]');
-                    if (!listbox) continue;
-                    if (ddBlockIdx === qIdx) {
-                        listbox.click();
-                        return true;
-                    }
-                    ddBlockIdx++;
+            opened = await self.page.evaluate("""([qIdx, qLabel]) => {
+                const labelClean = (qLabel || '').toLowerCase().trim();
+                const blocks = Array.from(document.querySelectorAll('div[role="listitem"]'));
+
+                let targetBlock = null;
+                if (labelClean) {
+                    targetBlock = blocks.find(b => {
+                        const heading = b.querySelector('div[role="heading"], .M7eMe, span');
+                        return heading && heading.innerText.toLowerCase().includes(labelClean);
+                    });
+                }
+                if (!targetBlock && qIdx < blocks.length) {
+                    targetBlock = blocks[qIdx];
+                }
+
+                const searchRoot = targetBlock || document;
+                const listbox = searchRoot.querySelector('div[role="listbox"]');
+                if (listbox) {
+                    listbox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    listbox.click();
+                    return true;
                 }
                 return false;
-            }""", question_index)
+            }""", [question_index, question_label])
 
             if not opened:
                 return False
 
-            await asyncio.sleep(0.8)  # Wait for dropdown animation
+            await asyncio.sleep(1.0)
 
-            # Now select the option from the opened dropdown
             success = await self.page.evaluate("""(optText) => {
-                // Google Forms dropdown options appear as div[role="option"] in a presentation layer
-                const options = document.querySelectorAll('div[role="option"], div[data-value]');
+                const optClean = (optText || '').toLowerCase().trim();
+                const options = Array.from(document.querySelectorAll('div[role="option"], div[data-value], span.vRMGwf'));
                 for (const opt of options) {
-                    const label = (opt.getAttribute('data-value') || opt.innerText.trim()).toLowerCase();
-                    if (label === optText.toLowerCase() || label.includes(optText.toLowerCase())) {
+                    const label = (opt.getAttribute('data-value') || opt.innerText || '').toLowerCase().trim();
+                    if (label === optClean || label.includes(optClean) || optClean.includes(label)) {
                         opt.click();
                         return true;
                     }
@@ -418,7 +455,7 @@ class BrowserTool:
             }""", option_text)
 
             if success:
-                logger.info(f"[Browser] Selected dropdown option '{option_text}' at question index {question_index}")
+                logger.info(f"[Browser] ✅ Selected dropdown option '{option_text}' for '{question_label}'")
             return success
         except Exception as e:
             logger.error(f"Error selecting dropdown option: {e}")
