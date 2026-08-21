@@ -378,45 +378,65 @@ class BrowserTool:
             return False
 
     async def select_radio_option(self, question_index: int, option_text: str, question_label: str = "") -> bool:
-        """Clicks a radio button option in a Google Form by question label or index."""
+        """Clicks a radio button option in a Google Form or web portal by question label or index."""
         if not self.page or not option_text:
             return False
         try:
             success = await self.page.evaluate("""([qIdx, optText, qLabel]) => {
                 const optClean = (optText || '').toLowerCase().trim();
-                const labelClean = (qLabel || '').toLowerCase().trim();
-                const blocks = Array.from(document.querySelectorAll('div[role="listitem"]'));
+                const normalize = (s) => (s || '').toLowerCase().replace(/[*?:\n\r\t]+/g, ' ').replace(/\s+/g, ' ').trim();
+                const labelClean = normalize(qLabel);
+                
+                const blocks = Array.from(document.querySelectorAll('div[role="listitem"], fieldset, .freebirdFormviewerViewNumberedItemContainer'));
 
                 // Find the target block by label match or by index
                 let targetBlock = null;
                 if (labelClean) {
                     targetBlock = blocks.find(b => {
-                        const heading = b.querySelector('div[role="heading"], .M7eMe, span');
-                        return heading && heading.innerText.toLowerCase().includes(labelClean);
+                        const heading = b.querySelector('div[role="heading"], .M7eMe, legend, label, span');
+                        if (!heading) return false;
+                        const headingText = normalize(heading.innerText);
+                        return headingText.includes(labelClean) || labelClean.includes(headingText) ||
+                               labelClean.split(' ').slice(0, 4).every(w => headingText.includes(w));
                     });
                 }
                 if (!targetBlock && qIdx < blocks.length) {
                     targetBlock = blocks[qIdx];
                 }
 
-                // If target block found, search within it
+                // If target block found, search within it; otherwise search entire page
                 const searchRoot = targetBlock || document;
-                const radios = Array.from(searchRoot.querySelectorAll('div[role="radio"], label[role="radio"]'));
+                const radios = Array.from(searchRoot.querySelectorAll('div[role="radio"], label[role="radio"], input[type="radio"]'));
 
                 for (const radio of radios) {
-                    const rValue = (radio.getAttribute('data-value') || '').toLowerCase().trim();
+                    const rValue = (radio.getAttribute('data-value') || radio.value || '').toLowerCase().trim();
                     const rText = (radio.innerText || '').toLowerCase().trim();
                     const rAria = (radio.getAttribute('aria-label') || '').toLowerCase().trim();
+                    const containerText = (radio.closest('.docssharedWizToggleLabeledContainer, label, div[jsaction]')?.innerText || '').toLowerCase().trim();
 
-                    if (rValue === optClean || rText === optClean || rAria === optClean ||
+                    if (rValue === optClean || rText === optClean || rAria === optClean || containerText.includes(optClean) ||
                         rValue.includes(optClean) || rText.includes(optClean) || optClean.includes(rValue)) {
+                        
                         radio.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        
+                        // 1. Direct click on element
                         radio.click();
-                        // Dispatch mouse & change events
+                        
+                        // 2. Click container label (Google Forms Material handler)
+                        const container = radio.closest('.docssharedWizToggleLabeledContainer, label, div[jsaction], div[jsmodel]');
+                        if (container && container !== radio) {
+                            container.click();
+                        }
+                        
+                        // 3. Synthetic events
+                        radio.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+                        radio.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
                         radio.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
                         radio.dispatchEvent(new Event('change', { bubbles: true }));
-                        const parent = radio.parentElement;
-                        if (parent) parent.click();
+                        
+                        if (radio.tagName.toLowerCase() === 'input') {
+                            radio.checked = true;
+                        }
                         return true;
                     }
                 }

@@ -84,10 +84,13 @@ class FormTool:
                 options = inp.get("options", [])
                 match = memory_engine.match_option(label, options)
                 if match:
+                    chosen_val = match["matched_option"]
+                    # Click option immediately on Chrome so page displays it
+                    await browser_tool.select_radio_option(q_index, chosen_val, label)
                     filled_fields.append({
                         "field_label": label,
                         "field_id": inp.get("id"),
-                        "value": match["matched_option"],
+                        "value": chosen_val,
                         "options": options,
                         "fieldType": "radio",
                         "questionIndex": q_index,
@@ -118,6 +121,8 @@ class FormTool:
                             break
                 
                 if matched_opts:
+                    # Click checkboxes immediately on Chrome
+                    await browser_tool.select_checkbox_options(q_index, matched_opts, label)
                     filled_fields.append({
                         "field_label": label,
                         "field_id": inp.get("id"),
@@ -143,10 +148,13 @@ class FormTool:
                 options = inp.get("options", [])
                 match = memory_engine.match_option(label, options)
                 if match:
+                    chosen_val = match["matched_option"]
+                    # Select option immediately on Chrome
+                    await browser_tool.select_dropdown_option(q_index, chosen_val, label)
                     filled_fields.append({
                         "field_label": label,
                         "field_id": inp.get("id"),
-                        "value": match["matched_option"],
+                        "value": chosen_val,
                         "options": options,
                         "fieldType": "dropdown",
                         "questionIndex": q_index,

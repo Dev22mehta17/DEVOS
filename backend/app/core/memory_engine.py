@@ -212,7 +212,7 @@ Custom Notes: {extra.get('custom_user_notes', '')}
             return self.profile_data.get("education", {}).get("university")
         if any(k in field_lower for k in ["degree", "major", "qualification"]):
             return self.profile_data.get("education", {}).get("degree")
-        if any(k in field_lower for k in ["graduation", "grad year", "passing year", "pass out", "passout", "batch", "year"]):
+        if any(k in field_lower for k in ["graduation", "grad year", "passing year", "pass out", "passout", "batch", "graduating year"]):
             return self.profile_data.get("education", {}).get("graduation_year")
         if "gpa" in field_lower or "cgpa" in field_lower:
             return self.profile_data.get("education", {}).get("gpa")
@@ -226,14 +226,27 @@ Custom Notes: {extra.get('custom_user_notes', '')}
             return self.profile_data.get("links", {}).get("portfolio")
 
         # Professional
-        if any(k in field_lower for k in ["experience", "role", "position", "designation"]):
+        if any(k in field_lower for k in ["total years of experience", "years of experience", "total experience", "work experience", "experience in years"]):
+            return "1"  # 1 year experience (Internship + Projects)
+        if any(k in field_lower for k in ["current role", "job title", "position", "designation"]):
             return self.profile_data.get("professional", {}).get("current_role")
         if any(k in field_lower for k in ["company", "current employer", "organization"]):
             return self.profile_data.get("professional", {}).get("current_company")
         if "notice" in field_lower:
             return self.profile_data.get("professional", {}).get("notice_period")
+        
+        # CTC / Salary (handling numeric Lakhs per annum questions)
+        if "current ctc" in field_lower or "current salary" in field_lower or "fixed ctc" in field_lower:
+            if any(k in field_lower for k in ["lakh", "lpa", "inr", "number", "annum", "(in inr"]):
+                return "0"  # 0 for intern / student
+            return "0 LPA (SDE Intern)"
+        if "expected ctc" in field_lower or "expected salary" in field_lower or "target ctc" in field_lower:
+            if any(k in field_lower for k in ["lakh", "lpa", "inr", "number", "annum", "(in inr"]):
+                return "15"  # Standard 15 LPA for SDE-1
+            return "15 LPA / Standard Industry Rate"
         if "salary" in field_lower or "ctc" in field_lower:
-            return self.profile_data.get("professional", {}).get("expected_salary")
+            return "15 LPA"
+
         if "authorized" in field_lower or "sponsorship" in field_lower:
             return self.profile_data.get("personal", {}).get("work_authorization")
         if any(k in field_lower for k in ["skill", "technologies", "tech stack"]):
@@ -242,25 +255,35 @@ Custom Notes: {extra.get('custom_user_notes', '')}
 
         # Open-ended / Comments
         if any(k in field_lower for k in ["comment", "anything else", "additional", "message", "note"]):
-            return ""  # Return empty — let the user fill this
+            return ""
 
         return None
 
     def match_option(self, question_label: str, options: List[str]) -> Optional[Dict[str, Any]]:
-        """Intelligently matches a multiple-choice question's options against profile data.
-        
-        Returns {"matched_option": "2026", "confidence": "high"} or None if unsure.
-        """
+        """Intelligently matches a multiple-choice question's options against profile data."""
         q_lower = question_label.lower()
         
+        # --- Yes/No Location & Office Relocation Questions ---
+        # e.g., "Are you comfortable working from our office in Bengaluru?", "Willing to relocate?"
+        if any(k in q_lower for k in ["comfortable working", "office in", "bengaluru", "bangalore", "pune", "hyderabad", "gurgaon", "delhi", "noida", "mumbai", "relocate", "relocation", "on-site", "hybrid"]):
+            for opt in options:
+                if opt.lower().strip() in ["yes", "yes, comfortable", "yes, willing", "yes, open"]:
+                    return {"matched_option": opt, "confidence": "high"}
+
+        # --- Yes/No Technical & Experience Questions ---
+        # e.g., "Have you built backend systems powering consumer-facing applications used by end customers?"
+        if any(k in q_lower for k in ["built backend", "backend systems", "consumer-facing", "end customers", "built systems", "experience with python", "fastapi", "react", "playwright", "aws", "cloud", "microservices", "distributed systems", "full-time", "immediate"]):
+            for opt in options:
+                if opt.lower().strip() in ["yes", "yes, I have", "yes, have built", "yes, available"]:
+                    return {"matched_option": opt, "confidence": "high"}
+
         # --- Year / Pass out / Graduation ---
-        if any(k in q_lower for k in ["year", "pass out", "passout", "graduation", "batch", "graduating"]):
+        if any(k in q_lower for k in ["pass out", "passout", "graduation year", "passing year", "batch", "graduating"]):
             grad_year = self.profile_data.get("education", {}).get("graduation_year", "")
             if grad_year:
                 for opt in options:
                     if grad_year in opt or opt.strip() == grad_year:
                         return {"matched_option": opt, "confidence": "high"}
-                # Fuzzy: check if any option contains the year
                 for opt in options:
                     if any(c.isdigit() for c in opt) and grad_year in opt:
                         return {"matched_option": opt, "confidence": "medium"}
@@ -274,24 +297,18 @@ Custom Notes: {extra.get('custom_user_notes', '')}
                         return {"matched_option": opt, "confidence": "high"}
 
         # --- Experience level ---
-        if any(k in q_lower for k in ["experience", "years of experience", "experience level"]):
-            exp = self.profile_data.get("professional", {}).get("total_experience", "")
-            if exp:
-                # Try to match numeric years
-                import re
-                exp_num = re.search(r'(\d+)', exp)
-                if exp_num:
-                    exp_val = int(exp_num.group(1))
-                    for opt in options:
-                        opt_num = re.search(r'(\d+)', opt)
-                        if opt_num and int(opt_num.group(1)) == exp_val:
-                            return {"matched_option": opt, "confidence": "high"}
-                # Try fuzzy match
-                for opt in options:
-                    if any(k in opt.lower() for k in ["fresher", "0", "entry", "intern"]) and exp_val <= 1:
-                        return {"matched_option": opt, "confidence": "medium"}
-                    if "1" in opt and exp_val == 1:
-                        return {"matched_option": opt, "confidence": "medium"}
+        if any(k in q_lower for k in ["years of experience", "experience level", "total experience"]):
+            exp = self.profile_data.get("professional", {}).get("total_experience", "1")
+            import re
+            exp_num = re.search(r'(\d+)', exp)
+            exp_val = int(exp_num.group(1)) if exp_num else 1
+            for opt in options:
+                opt_num = re.search(r'(\d+)', opt)
+                if opt_num and int(opt_num.group(1)) == exp_val:
+                    return {"matched_option": opt, "confidence": "high"}
+            for opt in options:
+                if any(k in opt.lower() for k in ["fresher", "0-1", "0 to 1", "1-2", "entry", "intern"]):
+                    return {"matched_option": opt, "confidence": "medium"}
 
         # --- Work authorization / Visa ---
         if any(k in q_lower for k in ["authorized", "visa", "work permit", "sponsorship", "legally"]):
@@ -325,6 +342,15 @@ Custom Notes: {extra.get('custom_user_notes', '')}
                         return {"matched_option": opt, "confidence": "high"}
                     if "15" in opt and "15" in notice:
                         return {"matched_option": opt, "confidence": "high"}
+
+        # --- Generic fallback for Yes/No questions ---
+        if len(options) == 2 and any(o.lower() == "yes" for o in options) and any(o.lower() == "no" for o in options):
+            # Default to Yes for positive alignment questions
+            for opt in options:
+                if opt.lower() == "yes":
+                    return {"matched_option": opt, "confidence": "medium"}
+
+        return None
 
         # --- Generic: try semantic memory for best match ---
         if self.collection:

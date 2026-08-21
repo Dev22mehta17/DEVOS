@@ -51,7 +51,7 @@
       "/Users/devmehta/Downloads",
       "/Users/devmehta/Documents"
     ],
-    "active_resume_path": "DevMehta_CV.pdf"
+    "active_resume_path": "/Users/devmehta/Agent_mac/backend/uploads/DevMehta_CV.pdf"
   },
   "extra_context": {
     "career_narrative": "Passionate Software Engineer specializing in backend distributed systems, high-performance APIs, and browser automation agents. Worked as an SDE Intern at Amazon building scalable cloud microservices. Experienced in Python, FastAPI, React, Playwright, and PostgreSQL.",
