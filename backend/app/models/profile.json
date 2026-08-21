@@ -9,10 +9,10 @@
     "gender": "Male"
   },
   "education": {
-    "university": "Thapar Institute Of Engineering and Technology, Patiala August 2022 - July 2026",
-    "degree": "B.E. Computer Engineering, CGPA: 8.7",
+    "university": "Thapar Institute of Engineering and Technology, Patiala",
+    "degree": "B.E. Computer Engineering",
     "graduation_year": "2026",
-    "gpa": "3.8/4.0",
+    "gpa": "8.7 / 10.0 (3.8/4.0)",
     "coursework": [
       "Data Structures",
       "Algorithms",

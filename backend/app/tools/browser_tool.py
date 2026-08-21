@@ -384,60 +384,75 @@ class BrowserTool:
         try:
             success = await self.page.evaluate("""([qIdx, optText, qLabel]) => {
                 const optClean = (optText || '').toLowerCase().trim();
-                const normalize = (s) => (s || '').toLowerCase().replace(/[*?:\n\r\t]+/g, ' ').replace(/\s+/g, ' ').trim();
-                const labelClean = normalize(qLabel);
-                
-                const blocks = Array.from(document.querySelectorAll('div[role="listitem"], fieldset, .freebirdFormviewerViewNumberedItemContainer'));
+                const cleanStr = (s) => (s || '').toLowerCase().replace(/[*?:\n\r\t,._()\-]+/g, ' ').replace(/\s+/g, ' ').trim();
+                const targetLabel = cleanStr(qLabel);
+                const labelWords = targetLabel.split(' ').filter(w => w.length > 2);
 
-                // Find the target block by label match or by index
+                const blocks = Array.from(document.querySelectorAll('div[role="listitem"], fieldset, .freebirdFormviewerViewNumberedItemContainer, .geS5n'));
+
+                // Strategy 1: Find target question block by heading similarity
                 let targetBlock = null;
-                if (labelClean) {
-                    targetBlock = blocks.find(b => {
-                        const heading = b.querySelector('div[role="heading"], .M7eMe, legend, label, span');
-                        if (!heading) return false;
-                        const headingText = normalize(heading.innerText);
-                        return headingText.includes(labelClean) || labelClean.includes(headingText) ||
-                               labelClean.split(' ').slice(0, 4).every(w => headingText.includes(w));
-                    });
-                }
+                let bestScore = 0;
+
+                blocks.forEach((b, idx) => {
+                    const headingEl = b.querySelector('div[role="heading"], .M7eMe, legend, label, span');
+                    if (!headingEl) return;
+                    const hText = cleanStr(headingEl.innerText);
+                    if (!hText) return;
+
+                    let score = 0;
+                    if (hText.includes(targetLabel) || targetLabel.includes(hText)) {
+                        score = 100;
+                    } else {
+                        labelWords.forEach(w => {
+                            if (hText.includes(w)) score += 10;
+                        });
+                    }
+
+                    if (score > bestScore && score >= 20) {
+                        bestScore = score;
+                        targetBlock = b;
+                    }
+                });
+
                 if (!targetBlock && qIdx < blocks.length) {
                     targetBlock = blocks[qIdx];
                 }
 
-                // If target block found, search within it; otherwise search entire page
-                const searchRoot = targetBlock || document;
-                const radios = Array.from(searchRoot.querySelectorAll('div[role="radio"], label[role="radio"], input[type="radio"]'));
+                // Strategy 2: Search within targetBlock, then fallback to whole document
+                const roots = targetBlock ? [targetBlock, document] : [document];
 
-                for (const radio of radios) {
-                    const rValue = (radio.getAttribute('data-value') || radio.value || '').toLowerCase().trim();
-                    const rText = (radio.innerText || '').toLowerCase().trim();
-                    const rAria = (radio.getAttribute('aria-label') || '').toLowerCase().trim();
-                    const containerText = (radio.closest('.docssharedWizToggleLabeledContainer, label, div[jsaction]')?.innerText || '').toLowerCase().trim();
+                for (const searchRoot of roots) {
+                    const radios = Array.from(searchRoot.querySelectorAll('div[role="radio"], label[role="radio"], input[type="radio"], .docssharedWizToggleLabeledContainer'));
 
-                    if (rValue === optClean || rText === optClean || rAria === optClean || containerText.includes(optClean) ||
-                        rValue.includes(optClean) || rText.includes(optClean) || optClean.includes(rValue)) {
-                        
-                        radio.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        
-                        // 1. Direct click on element
-                        radio.click();
-                        
-                        // 2. Click container label (Google Forms Material handler)
-                        const container = radio.closest('.docssharedWizToggleLabeledContainer, label, div[jsaction], div[jsmodel]');
-                        if (container && container !== radio) {
-                            container.click();
+                    for (const el of radios) {
+                        const radioInput = el.getAttribute('role') === 'radio' ? el : el.querySelector('div[role="radio"], input[type="radio"]') || el;
+                        const rValue = (radioInput.getAttribute('data-value') || radioInput.value || '').toLowerCase().trim();
+                        const rText = (el.innerText || '').toLowerCase().trim();
+                        const rAria = (radioInput.getAttribute('aria-label') || '').toLowerCase().trim();
+
+                        if (rValue === optClean || rText.includes(optClean) || rAria.includes(optClean) || optClean.includes(rValue)) {
+                            radioInput.scrollIntoView({ behavior: 'auto', block: 'center' });
+
+                            // Trigger click on radio and parent containers
+                            radioInput.click();
+                            el.click();
+
+                            const span = el.querySelector('span');
+                            if (span) span.click();
+
+                            // Dispatch synthetic click & change events
+                            radioInput.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+                            radioInput.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+                            radioInput.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                            radioInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+                            radioInput.setAttribute('aria-checked', 'true');
+                            if (radioInput.tagName && radioInput.tagName.toLowerCase() === 'input') {
+                                radioInput.checked = true;
+                            }
+                            return true;
                         }
-                        
-                        // 3. Synthetic events
-                        radio.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-                        radio.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
-                        radio.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-                        radio.dispatchEvent(new Event('change', { bubbles: true }));
-                        
-                        if (radio.tagName.toLowerCase() === 'input') {
-                            radio.checked = true;
-                        }
-                        return true;
                     }
                 }
                 return false;

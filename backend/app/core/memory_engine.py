@@ -195,29 +195,40 @@ Custom Notes: {extra.get('custom_user_notes', '')}
         """Maps standard form field keys to memory profile entries."""
         field_lower = field_name.lower().replace("_", " ").replace("-", " ")
         
-        # Personal
-        if any(k in field_lower for k in ["name", "full name", "first name", "applicant"]):
-            return self.profile_data.get("personal", {}).get("full_name")
-        if "email" in field_lower:
-            return self.profile_data.get("personal", {}).get("email_primary")
-        if any(k in field_lower for k in ["phone", "mobile", "contact number"]):
-            return self.profile_data.get("personal", {}).get("phone")
-        if any(k in field_lower for k in ["location", "address", "city", "state"]):
-            return self.profile_data.get("personal", {}).get("location")
-        if "gender" in field_lower:
-            return self.profile_data.get("personal", {}).get("gender")
-            
-        # Education
-        if any(k in field_lower for k in ["university", "college", "school", "institution"]):
+        # 1. Offer in Hand / Other Offers (Specific check before general CTC/salary)
+        if any(k in field_lower for k in ["offer in hand", "any offer", "holding offer", "holding any offer", "other offer", "competing offer", "current offer"]):
+            return "No offer in hand / Currently interviewing"
+
+        # 2. Education & College (Specific check before candidate name!)
+        if any(k in field_lower for k in ["college", "university", "school", "institution", "institute", "alma mater"]):
             return self.profile_data.get("education", {}).get("university")
-        if any(k in field_lower for k in ["degree", "major", "qualification"]):
+        if any(k in field_lower for k in ["degree", "major", "qualification", "branch", "stream"]):
             return self.profile_data.get("education", {}).get("degree")
         if any(k in field_lower for k in ["graduation", "grad year", "passing year", "pass out", "passout", "batch", "graduating year"]):
             return self.profile_data.get("education", {}).get("graduation_year")
         if "gpa" in field_lower or "cgpa" in field_lower:
             return self.profile_data.get("education", {}).get("gpa")
 
-        # Links
+        # 3. Company & Employer (Specific check before candidate name!)
+        if any(k in field_lower for k in ["company name", "current employer", "organization name", "current company", "firm name"]):
+            return self.profile_data.get("professional", {}).get("current_company")
+
+        # 4. Personal Contact & Candidate Name
+        if "email" in field_lower:
+            return self.profile_data.get("personal", {}).get("email_primary")
+        if any(k in field_lower for k in ["phone", "mobile", "contact number", "whatsapp"]):
+            return self.profile_data.get("personal", {}).get("phone")
+        if any(k in field_lower for k in ["location", "address", "city", "state", "current location"]):
+            return self.profile_data.get("personal", {}).get("location")
+        if "gender" in field_lower:
+            return self.profile_data.get("personal", {}).get("gender")
+
+        # Candidate Name (Only if NOT college name, company name, school name)
+        if any(k in field_lower for k in ["full name", "your name", "candidate name", "applicant name", "first name"]) or \
+           (field_lower.strip() in ["name", "name *"] or ("name" in field_lower and not any(x in field_lower for x in ["college", "univ", "school", "comp", "employ", "org", "proj", "role", "file", "skill"]))):
+            return self.profile_data.get("personal", {}).get("full_name")
+
+        # 5. Links
         if "github" in field_lower:
             return self.profile_data.get("links", {}).get("github")
         if "linkedin" in field_lower:
@@ -225,17 +236,17 @@ Custom Notes: {extra.get('custom_user_notes', '')}
         if "portfolio" in field_lower or "website" in field_lower:
             return self.profile_data.get("links", {}).get("portfolio")
 
-        # Professional
+        # 6. Professional Experience
         if any(k in field_lower for k in ["total years of experience", "years of experience", "total experience", "work experience", "experience in years"]):
             return "1"  # 1 year experience (Internship + Projects)
         if any(k in field_lower for k in ["current role", "job title", "position", "designation"]):
             return self.profile_data.get("professional", {}).get("current_role")
-        if any(k in field_lower for k in ["company", "current employer", "organization"]):
+        if any(k in field_lower for k in ["company", "employer", "organization"]):
             return self.profile_data.get("professional", {}).get("current_company")
         if "notice" in field_lower:
             return self.profile_data.get("professional", {}).get("notice_period")
         
-        # CTC / Salary (handling numeric Lakhs per annum questions)
+        # 7. CTC / Salary
         if "current ctc" in field_lower or "current salary" in field_lower or "fixed ctc" in field_lower:
             if any(k in field_lower for k in ["lakh", "lpa", "inr", "number", "annum", "(in inr"]):
                 return "0"  # 0 for intern / student
@@ -253,7 +264,7 @@ Custom Notes: {extra.get('custom_user_notes', '')}
             skills = self.profile_data.get("professional", {}).get("skills", [])
             return ", ".join(skills) if skills else None
 
-        # Open-ended / Comments
+        # 8. Open-ended / Comments
         if any(k in field_lower for k in ["comment", "anything else", "additional", "message", "note"]):
             return ""
 
@@ -263,16 +274,22 @@ Custom Notes: {extra.get('custom_user_notes', '')}
         """Intelligently matches a multiple-choice question's options against profile data."""
         q_lower = question_label.lower()
         
+        # --- Offer in Hand (No) ---
+        if any(k in q_lower for k in ["offer in hand", "any offer", "holding offer", "holding any offer", "other offers"]):
+            for opt in options:
+                if opt.lower().strip() in ["no", "no offer", "none"]:
+                    return {"matched_option": opt, "confidence": "high"}
+
         # --- Yes/No Location & Office Relocation Questions ---
-        # e.g., "Are you comfortable working from our office in Bengaluru?", "Willing to relocate?"
-        if any(k in q_lower for k in ["comfortable working", "office in", "bengaluru", "bangalore", "pune", "hyderabad", "gurgaon", "delhi", "noida", "mumbai", "relocate", "relocation", "on-site", "hybrid"]):
+        # e.g., "Are you willing to work from our Gurgaon office 5 days a week?", "Are you comfortable working from Bengaluru?"
+        if any(k in q_lower for k in ["willing to work", "comfortable working", "work from", "office", "gurgaon", "bengaluru", "bangalore", "pune", "hyderabad", "gurugram", "delhi", "noida", "mumbai", "relocate", "relocation", "on-site", "hybrid", "days a week", "5 days"]):
             for opt in options:
                 if opt.lower().strip() in ["yes", "yes, comfortable", "yes, willing", "yes, open"]:
                     return {"matched_option": opt, "confidence": "high"}
 
         # --- Yes/No Technical & Experience Questions ---
         # e.g., "Have you built backend systems powering consumer-facing applications used by end customers?"
-        if any(k in q_lower for k in ["built backend", "backend systems", "consumer-facing", "end customers", "built systems", "experience with python", "fastapi", "react", "playwright", "aws", "cloud", "microservices", "distributed systems", "full-time", "immediate"]):
+        if any(k in q_lower for k in ["built backend", "backend systems", "consumer-facing", "end customers", "built systems", "experience with python", "fastapi", "react", "playwright", "aws", "cloud", "microservices", "distributed systems", "full-time", "immediate", "comfortable with"]):
             for opt in options:
                 if opt.lower().strip() in ["yes", "yes, I have", "yes, have built", "yes, available"]:
                     return {"matched_option": opt, "confidence": "high"}
@@ -345,7 +362,6 @@ Custom Notes: {extra.get('custom_user_notes', '')}
 
         # --- Generic fallback for Yes/No questions ---
         if len(options) == 2 and any(o.lower() == "yes" for o in options) and any(o.lower() == "no" for o in options):
-            # Default to Yes for positive alignment questions
             for opt in options:
                 if opt.lower() == "yes":
                     return {"matched_option": opt, "confidence": "medium"}
