@@ -159,7 +159,17 @@ async def execute_goal(req: GoalRequest):
             # Universal Web Workflow (Taleo, Greenhouse, Lever, Workday, Portals)
             form_res = await universal_web_tool.execute_web_task(url, req.goal)
 
-        filled_count = len(form_res["payload"].get("filled_fields", []))
+        if form_res.get("status") == "PAGE_NOT_FOUND":
+            await push_stream_event("COMPLETED", f"⚠️ Error: The target link returned 'Page not found' (404). Please verify that the form link is correct and accessible.")
+            return form_res
+
+        filled_count = len(form_res.get("payload", {}).get("filled_fields", []))
+        flagged_count = len(form_res.get("payload", {}).get("flagged_fields", []))
+
+        if filled_count == 0 and flagged_count == 0:
+            await push_stream_event("COMPLETED", f"⚠️ No form fields detected on {url}. The form may be closed, restricted, or requires login.")
+            return form_res
+
         await push_stream_event("DOM_ACTION", f"Detected and populated {filled_count} fields directly on open Chrome page.")
         await push_stream_event("APPROVAL_REQUIRED", f"Review sheet generated ({filled_count} fields). Review in modal and click Approve to submit.", form_res["payload"])
         return form_res

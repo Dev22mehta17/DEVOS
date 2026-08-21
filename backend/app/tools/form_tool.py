@@ -18,7 +18,16 @@ class FormTool:
 
         # Step 1: Open Form URL
         nav_result = await browser_tool.navigate(form_url)
-        await asyncio.sleep(2.0)  # Wait for form to fully render
+        await asyncio.sleep(2.5)  # Wait for form to fully render
+
+        page_title = nav_result.get("title", "")
+        if "page not found" in page_title.lower() or "404" in page_title.lower():
+            logger.warning(f"[FormTool] Page returned 404 / Not Found for {form_url}")
+            return {
+                "status": "PAGE_NOT_FOUND",
+                "message": f"The page at {form_url} returned 'Page not found'. Please verify the form link.",
+                "payload": {"form_url": form_url, "page_title": page_title, "filled_fields": [], "flagged_fields": []}
+            }
 
         # Step 2: Inspect ALL Form Inputs (text, radio, checkbox, dropdown, file)
         inputs = await browser_tool.inspect_inputs()
