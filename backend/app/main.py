@@ -230,12 +230,37 @@ async def execute_goal(req: GoalRequest):
 
     # ─── Priority 4: Real Web Search & Research ───
     else:
-        query = req.goal.replace("search", "").replace("find", "").replace("research", "").strip()
+        query = req.goal.replace("search for", "").replace("search", "").replace("find out", "").replace("research", "").strip()
+        if not query:
+            query = req.goal.strip()
         search_url = f"https://www.google.com/search?q={query.replace(' ', '+')}"
         await push_stream_event("DOM_ACTION", f"Submitting search query to Google: '{query}'")
         await browser_tool.navigate(search_url)
-        await push_stream_event("COMPLETED", f"Search completed for '{query}'. Top results displayed in Chrome.")
-        return {"status": "COMPLETED", "query": query, "url": search_url}
+
+        await push_stream_event("THINKING", "Extracting AI Overview, Key Facts, and top source snippets from Google...")
+        search_summary = await browser_tool.extract_search_summary()
+
+        direct_answer = search_summary.get("direct_answer", "")
+        key_facts = search_summary.get("key_facts", [])
+        sources = search_summary.get("sources", [])
+
+        # If no direct answer found on Google page, synthesize with local semantic engine
+        if not direct_answer:
+            hint_context = " ".join([s.get("title", "") + " " + s.get("snippet", "") for s in sources])
+            gen_res = answer_generator.generate_answer(query, context_hints=hint_context, max_words=60)
+            direct_answer = gen_res.get("answer", "")
+
+        search_data = {
+            "query": query,
+            "search_url": search_url,
+            "direct_answer": direct_answer,
+            "key_facts": key_facts,
+            "sources": sources
+        }
+
+        await push_stream_event("SEARCH_RESULT", f"Found direct answer for '{query}'", search_data)
+        await push_stream_event("COMPLETED", f"Search completed: Answer & sources displayed in UI and Chrome.", search_data)
+        return {"status": "COMPLETED", **search_data}
 
 @app.post("/api/approve")
 async def approve_action(req: ActionApprovalRequest):

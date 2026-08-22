@@ -764,6 +764,91 @@ class BrowserTool:
             logger.error(f"[Upload] Fatal error: {e}")
             return False
 
+    async def extract_search_summary(self) -> Dict[str, Any]:
+        """Scrapes AI Overview, featured answer snippet, key facts, and top organic results from Google Search."""
+        if not self.page:
+            return {"direct_answer": "", "key_facts": [], "sources": []}
+        try:
+            # Wait for dynamic AI Overview / results widgets
+            await asyncio.sleep(2.5)
+
+            extracted = await self.page.evaluate("""() => {
+                let answer = "";
+                const keyFacts = [];
+                const sources = [];
+
+                // 1. Extract from AI Overview / Featured Snippet container
+                const fullText = document.body.innerText;
+                const aiIdx = fullText.indexOf("AI Overview");
+                
+                if (aiIdx !== -1) {
+                    const afterAi = fullText.substring(aiIdx + "AI Overview".length).trim();
+                    const lines = afterAi.split("\\n").map(l => l.trim()).filter(l => l && !l.includes("हिन्दी") && !l.includes("Feedback") && !l.includes("Listen") && !l.includes("Share"));
+                    
+                    if (lines.length > 0) {
+                        answer = lines[0];
+                    }
+                    
+                    // Look for Key Facts section
+                    const kfIdx = afterAi.indexOf("Key Facts");
+                    if (kfIdx !== -1) {
+                        const kfLines = afterAi.substring(kfIdx + "Key Facts".length).split("\\n").map(l => l.trim()).filter(l => l);
+                        for (const kl of kfLines) {
+                            if (kl.includes(":") && (kl.startsWith("Role:") || kl.startsWith("Term") || kl.startsWith("Official") || kl.startsWith("Born") || kl.startsWith("President") || kl.startsWith("Capital") || kl.startsWith("Population") || kl.startsWith("Founded") || kl.startsWith("CEO") || kl.startsWith("Founder") || kl.startsWith("Headquarters") || kl.startsWith("Spouse") || kl.startsWith("Height") || kl.startsWith("Net worth") || kl.startsWith("Age"))) {
+                                keyFacts.push(kl);
+                            } else if (kl.includes("sites") || kl.includes("Wikipedia") || kl.length > 120) {
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // 2. Fallback: Knowledge Panel description or featured snippet
+                if (!answer) {
+                    const descEl = document.querySelector('div[data-attrid="description"], .kno-rdesc, .hgKElc, .V3FYCf, div[jsname="x3hk2d"]');
+                    if (descEl && descEl.innerText.trim()) {
+                        answer = descEl.innerText.trim();
+                    }
+                }
+
+                // 3. Extract top organic result links
+                const anchors = Array.from(document.querySelectorAll("a"));
+                const seenUrls = new Set();
+
+                for (const a of anchors) {
+                    const href = a.href || "";
+                    if (!href.startsWith("http") || href.includes("google.com") || href.includes("youtube.com/search") || href.includes("accounts.google")) continue;
+                    
+                    const titleEl = a.querySelector("h3") || (a.innerText.length > 10 && a.innerText.length < 80 ? a : null);
+                    if (titleEl && !seenUrls.has(href)) {
+                        seenUrls.add(href);
+                        const container = a.closest("div.g, div[data-sokoban-container], div.MjjYud, div") || a.parentElement;
+                        const snippetEl = container ? container.querySelector("div[style*='-webkit-line-clamp'], div.VwiC3b, span.aCOpRe, div.yXK7lf") : null;
+                        
+                        let domain = "";
+                        try { domain = new URL(href).hostname.replace("www.", ""); } catch(e){}
+
+                        sources.push({
+                            title: titleEl.innerText.trim().split("\\n")[0],
+                            url: href,
+                            source: domain,
+                            snippet: snippetEl ? snippetEl.innerText.trim() : ""
+                        });
+                        if (sources.length >= 4) break;
+                    }
+                }
+
+                return {
+                    direct_answer: answer,
+                    key_facts: keyFacts,
+                    sources: sources
+                };
+            }""")
+            return extracted or {"direct_answer": "", "key_facts": [], "sources": []}
+        except Exception as e:
+            logger.error(f"[BrowserTool] Error extracting search summary: {e}")
+            return {"direct_answer": "", "key_facts": [], "sources": []}
+
     async def close(self):
         try:
             if self.browser:

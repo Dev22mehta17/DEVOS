@@ -39,7 +39,23 @@ export default function StepStream({ logs, isProcessing }) {
               </span>
               <div className="log-msg">
                 {log.message}
-                {log.details && log.details.url && (
+                {log.details && log.details.direct_answer && (
+                  <div
+                    style={{
+                      background: 'rgba(0, 242, 254, 0.08)',
+                      border: '1px solid rgba(0, 242, 254, 0.25)',
+                      borderRadius: '6px',
+                      padding: '0.4rem 0.6rem',
+                      marginTop: '0.35rem',
+                      fontSize: '0.84rem',
+                      color: '#f0f6fc',
+                      lineHeight: 1.4
+                    }}
+                  >
+                    💡 <span style={{ color: 'var(--accent-cyan)', fontWeight: 600 }}>Answer:</span> {log.details.direct_answer}
+                  </div>
+                )}
+                {log.details && log.details.url && !log.details.direct_answer && (
                   <div style={{ fontSize: '0.8rem', color: 'var(--accent-cyan)', marginTop: '0.2rem' }}>
                     URL: {log.details.url}
                   </div>

@@ -4,6 +4,7 @@ import StepStream from './components/StepStream';
 import EmailPreviewModal from './components/EmailPreviewModal';
 import FormReviewModal from './components/FormReviewModal';
 import MemoryManager from './components/MemoryManager';
+import SearchAnswerCard from './components/SearchAnswerCard';
 
 export default function App() {
   const [goal, setGoal] = useState('');
@@ -11,6 +12,7 @@ export default function App() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [pendingEmail, setPendingEmail] = useState(null);
   const [pendingForm, setPendingForm] = useState(null);
+  const [searchResult, setSearchResult] = useState(null);
   const [profile, setProfile] = useState({});
 
   // 1. Listen to SSE live step stream
@@ -24,7 +26,11 @@ export default function App() {
 
         setLogs((prev) => [...prev, data]);
 
-        if (data.step_type === 'APPROVAL_REQUIRED') {
+        if (data.step_type === 'SEARCH_RESULT') {
+          if (data.details) {
+            setSearchResult(data.details);
+          }
+        } else if (data.step_type === 'APPROVAL_REQUIRED') {
           if (data.details && data.details.recipient) {
             setPendingEmail(data.details);
           } else if (data.details && data.details.filled_fields) {
@@ -33,6 +39,9 @@ export default function App() {
           setIsProcessing(false);
         } else if (data.step_type === 'COMPLETED') {
           setIsProcessing(false);
+          if (data.details && (data.details.direct_answer || data.details.sources)) {
+            setSearchResult(data.details);
+          }
         }
       } catch (err) {
         console.error('Error parsing SSE event:', err);
@@ -59,6 +68,7 @@ export default function App() {
     if (!targetGoal.trim()) return;
 
     setIsProcessing(true);
+    setSearchResult(null); // Clear previous search result card
     setGoal(''); // Clear input box for next command
     setLogs((prev) => [
       ...prev,
@@ -219,8 +229,22 @@ export default function App() {
               >
                 🌐 Web: Universal Registration
               </button>
+              <button
+                className="chip-btn"
+                onClick={() => {
+                  setGoal("Who is the president of Russia?");
+                }}
+              >
+                🔍 Search: "Who is the president of Russia?"
+              </button>
             </div>
           </div>
+
+          {/* Real-time Search Result & AI Answer Card */}
+          <SearchAnswerCard
+            searchResult={searchResult}
+            onClose={() => setSearchResult(null)}
+          />
 
           {/* Antigravity Step Feed */}
           <StepStream logs={logs} isProcessing={isProcessing} />
