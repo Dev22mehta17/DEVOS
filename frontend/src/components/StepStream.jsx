@@ -1,8 +1,12 @@
 import React, { useEffect, useRef } from 'react';
-import { Activity, Terminal, ShieldAlert } from 'lucide-react';
+import { Activity, Terminal, ShieldAlert, GitBranch, CheckCircle2, CircleDashed } from 'lucide-react';
 
 export default function StepStream({ logs, isProcessing }) {
   const scrollRef = useRef(null);
+
+  // Find latest plan if any
+  const latestPlanEvent = [...logs].reverse().find(l => l.step_type === 'PLAN_INITIALIZED');
+  const plan = latestPlanEvent ? latestPlanEvent.details : null;
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -15,7 +19,7 @@ export default function StepStream({ logs, isProcessing }) {
       <div className="stream-header">
         <div className="stream-title">
           <Terminal size={20} color="#00f2fe" />
-          <span>DevOS Thinking & Live Feed</span>
+          <span>DevOS Agent Core • Execution Stream</span>
         </div>
         {isProcessing && (
           <div className="status-badge">
@@ -24,6 +28,48 @@ export default function StepStream({ logs, isProcessing }) {
           </div>
         )}
       </div>
+
+      {/* Dynamic Agent Plan Bar */}
+      {plan && plan.steps && plan.steps.length > 0 && (
+        <div
+          style={{
+            background: 'rgba(0, 242, 254, 0.04)',
+            borderBottom: '1px solid rgba(0, 242, 254, 0.15)',
+            padding: '0.65rem 1.25rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.6rem',
+            overflowX: 'auto',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--accent-cyan)', fontSize: '0.74rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            <GitBranch size={13} />
+            <span>Plan ({plan.steps.length} Steps):</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            {plan.steps.map((s, idx) => (
+              <div
+                key={s.id || idx}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.3rem',
+                  fontSize: '0.74rem',
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                  color: 'var(--text-main)'
+                }}
+              >
+                <span style={{ color: 'var(--accent-cyan)', fontWeight: 700 }}>{s.index}.</span>
+                <span>{s.title}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="stream-logs-container" ref={scrollRef}>
         {logs.length === 0 ? (

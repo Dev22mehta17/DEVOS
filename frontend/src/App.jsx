@@ -5,6 +5,8 @@ import EmailPreviewModal from './components/EmailPreviewModal';
 import FormReviewModal from './components/FormReviewModal';
 import MemoryManager from './components/MemoryManager';
 import SearchAnswerCard from './components/SearchAnswerCard';
+import ResearchDossierCard from './components/ResearchDossierCard';
+import RecruiterQueueModal from './components/RecruiterQueueModal';
 
 export default function App() {
   const [goal, setGoal] = useState('');
@@ -13,6 +15,8 @@ export default function App() {
   const [pendingEmail, setPendingEmail] = useState(null);
   const [pendingForm, setPendingForm] = useState(null);
   const [searchResult, setSearchResult] = useState(null);
+  const [dossierResult, setDossierResult] = useState(null);
+  const [recruiterQueue, setRecruiterQueue] = useState(null);
   const [profile, setProfile] = useState({});
 
   // 1. Listen to SSE live step stream
@@ -26,7 +30,17 @@ export default function App() {
 
         setLogs((prev) => [...prev, data]);
 
-        if (data.step_type === 'SEARCH_RESULT') {
+        if (data.step_type === 'RESEARCH_DOSSIER') {
+          if (data.details) {
+            setDossierResult(data.details);
+          }
+          setIsProcessing(false);
+        } else if (data.step_type === 'RECRUITER_QUEUE') {
+          if (data.details) {
+            setRecruiterQueue(data.details);
+          }
+          setIsProcessing(false);
+        } else if (data.step_type === 'SEARCH_RESULT') {
           if (data.details) {
             setSearchResult(data.details);
           }
@@ -41,6 +55,8 @@ export default function App() {
           setIsProcessing(false);
           if (data.details && (data.details.direct_answer || data.details.sources)) {
             setSearchResult(data.details);
+          } else if (data.details && data.details.comparison_matrix) {
+            setDossierResult(data.details);
           }
         }
       } catch (err) {
@@ -69,6 +85,8 @@ export default function App() {
 
     setIsProcessing(true);
     setSearchResult(null); // Clear previous search result card
+    setDossierResult(null); // Clear previous dossier
+    setRecruiterQueue(null); // Clear previous recruiter queue
     setGoal(''); // Clear input box for next command
     setLogs((prev) => [
       ...prev,
@@ -232,10 +250,18 @@ export default function App() {
               <button
                 className="chip-btn"
                 onClick={() => {
-                  setGoal("Who is the president of Russia?");
+                  setGoal("Research Stripe vs Razorpay pricing in India, compare their payout settlement times and UPI transaction fees, and create a comparison table for me");
                 }}
               >
-                🔍 Search: "Who is the president of Russia?"
+                🔬 Deep Research: "Stripe vs Razorpay Comparison"
+              </button>
+              <button
+                className="chip-btn"
+                onClick={() => {
+                  setGoal("Check recruiter emails & triage my response queue");
+                }}
+              >
+                📬 Proactive: "Recruiter Inbox Triage Queue"
               </button>
             </div>
           </div>
@@ -244,6 +270,12 @@ export default function App() {
           <SearchAnswerCard
             searchResult={searchResult}
             onClose={() => setSearchResult(null)}
+          />
+
+          {/* Real-time Deep Research Dossier Card */}
+          <ResearchDossierCard
+            dossier={dossierResult}
+            onClose={() => setDossierResult(null)}
           />
 
           {/* Antigravity Step Feed */}
@@ -266,6 +298,12 @@ export default function App() {
         formData={pendingForm}
         onApprove={handleApproveAction}
         onReject={handleRejectAction}
+      />
+      <RecruiterQueueModal
+        queueData={recruiterQueue}
+        onApproveItem={handleApproveAction}
+        onApproveAll={() => setRecruiterQueue(null)}
+        onClose={() => setRecruiterQueue(null)}
       />
     </div>
   );
