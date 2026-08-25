@@ -17,7 +17,7 @@ class BrowserTool:
         self.is_connected = False
 
     async def initialize(self) -> bool:
-        """Attempts connection to Chrome CDP port 9222, fallback to persistent context."""
+        """Attempts connection to Chrome CDP port 9222, auto-spawning Chrome if needed."""
         try:
             if not self.playwright:
                 self.playwright = await async_playwright().start()
@@ -33,9 +33,38 @@ class BrowserTool:
                 logger.info(f"Successfully attached to active Chrome via CDP at {CDP_URL}")
                 return True
             except Exception as cdp_err:
-                logger.warning(f"Chrome CDP connection failed ({cdp_err}). Launching standalone Playwright Chromium...")
+                logger.info(f"Chrome CDP not active on {CDP_URL} ({cdp_err}). Auto-launching Google Chrome...")
 
-            # Attempt 2: Standalone Playwright Chromium with stealth flags
+            # Attempt 2: Auto-spawn real Google Chrome on Mac with remote debugging port 9222
+            try:
+                import subprocess
+                from pathlib import Path
+                profile_dir = Path.home() / ".gemini" / "antigravity" / "chrome_devos_profile"
+                profile_dir.mkdir(parents=True, exist_ok=True)
+
+                chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+                if os.path.exists(chrome_path):
+                    subprocess.Popen([
+                        chrome_path,
+                        "--remote-debugging-port=9222",
+                        f"--user-data-dir={str(profile_dir)}",
+                        "--no-first-run",
+                        "--no-default-browser-check"
+                    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    await asyncio.sleep(2.0)
+
+                    self.browser = await self.playwright.chromium.connect_over_cdp(CDP_URL)
+                    contexts = self.browser.contexts
+                    self.context = contexts[0] if contexts else await self.browser.new_context()
+                    pages = self.context.pages
+                    self.page = pages[0] if pages else await self.context.new_page()
+                    self.is_connected = True
+                    logger.info("✅ Auto-launched Google Chrome and attached via CDP.")
+                    return True
+            except Exception as spawn_err:
+                logger.warning(f"Could not auto-spawn Google Chrome: {spawn_err}")
+
+            # Attempt 3: Standalone Playwright Chromium with stealth flags
             self.browser = await self.playwright.chromium.launch(
                 headless=False,
                 args=["--disable-blink-features=AutomationControlled", "--no-sandbox"]
@@ -94,6 +123,13 @@ class BrowserTool:
     async def navigate(self, url: str) -> Dict[str, Any]:
         page = await self.get_active_page()
         try:
+            # Bring Chrome window to front on Mac so user sees it
+            try:
+                import subprocess
+                subprocess.run(["osascript", "-e", 'tell application "Google Chrome" to activate'], capture_output=True, timeout=2)
+            except Exception:
+                pass
+
             await page.goto(url, wait_until="domcontentloaded", timeout=30000)
             title = await page.title()
             current_url = page.url
