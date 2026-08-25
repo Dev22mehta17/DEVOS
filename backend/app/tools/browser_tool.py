@@ -348,21 +348,71 @@ class BrowserTool:
             logger.error(f"Error inspecting form inputs: {e}")
             return []
 
-    async def fill_input_by_index_or_name(self, idx: int, name: str, val: str) -> bool:
-        """Fills text input element directly on page and triggers DOM input/change events."""
+    async def fill_input_by_index_or_name(self, idx: int, name: str, val: str, label: str = "", question_index: int = None) -> bool:
+        """Fills text input element directly in its question block by label matching, with index fallback."""
         if not self.page:
             return False
         try:
-            success = await self.page.evaluate("""([idx, nameStr, valStr]) => {
+            success = await self.page.evaluate("""([idx, nameStr, valStr, labelStr, qIdx]) => {
+                const cleanStr = (s) => (s || '').toLowerCase().replace(/[*?:\n\r\t,._()\-]+/g, ' ').replace(/\s+/g, ' ').trim();
+                const targetLabel = cleanStr(labelStr);
+                const labelWords = targetLabel.split(' ').filter(w => w.length > 2);
+
                 let input = null;
-                if (nameStr) {
+
+                // Strategy 1: Find target question block by label text
+                if (targetLabel) {
+                    const blocks = Array.from(document.querySelectorAll('div[role="listitem"], .geS5n, .freebirdFormviewerViewNumberedItemContainer, fieldset'));
+                    let bestBlock = null;
+                    let bestScore = 0;
+
+                    blocks.forEach((b) => {
+                        const heading = b.querySelector('div[role="heading"], .M7eMe, legend, label, span');
+                        if (!heading) return;
+                        const hText = cleanStr(heading.innerText);
+                        if (!hText) return;
+
+                        let score = 0;
+                        if (hText.includes(targetLabel) || targetLabel.includes(hText)) {
+                            score = 100;
+                        } else {
+                            labelWords.forEach(w => {
+                                if (hText.includes(w)) score += 10;
+                            });
+                        }
+
+                        if (score > bestScore && score >= 20) {
+                            bestScore = score;
+                            bestBlock = b;
+                        }
+                    });
+
+                    if (bestBlock) {
+                        input = bestBlock.querySelector('input[type="text"], input[type="email"], input[type="tel"], input[type="number"], input[type="url"], input[type="date"], textarea, input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"])');
+                    }
+                }
+
+                // Strategy 2: Find by question index if provided
+                if (!input && qIdx !== null && qIdx !== undefined) {
+                    const blocks = Array.from(document.querySelectorAll('div[role="listitem"], .geS5n, .freebirdFormviewerViewNumberedItemContainer, fieldset'));
+                    if (qIdx < blocks.length) {
+                        input = blocks[qIdx].querySelector('input[type="text"], input[type="email"], input[type="tel"], input[type="number"], input[type="url"], textarea, input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"])');
+                    }
+                }
+
+                // Strategy 3: Find by name attribute
+                if (!input && nameStr) {
                     input = document.querySelector(`input[name="${nameStr}"], textarea[name="${nameStr}"]`);
                 }
-                if (!input) {
+
+                // Strategy 4: Fallback to global index
+                if (!input && idx !== null && idx !== undefined) {
                     const all = Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"], input[type="number"], input[type="url"], input[type="date"], textarea'));
                     input = all[idx];
                 }
+
                 if (input) {
+                    input.scrollIntoView({ behavior: 'auto', block: 'center' });
                     input.focus();
                     input.value = valStr;
                     input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -371,10 +421,10 @@ class BrowserTool:
                     return true;
                 }
                 return false;
-            }""", [idx, name, val])
+            }""", [idx, name, str(val), label, question_index])
             return success
         except Exception as e:
-            logger.error(f"Error filling input idx {idx}: {e}")
+            logger.error(f"Error filling input for label '{label}' (idx {idx}): {e}")
             return False
 
     async def select_radio_option(self, question_index: int, option_text: str, question_label: str = "") -> bool:

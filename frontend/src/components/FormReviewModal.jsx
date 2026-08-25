@@ -155,6 +155,8 @@ export default function FormReviewModal({ formData, onApprove, onReject }) {
             value: Array.isArray(answer) ? answer.join(', ') : answer,
             fieldType: f.fieldType || 'text',
             questionIndex: f.questionIndex,
+            index: f.index,
+            name: f.name,
             options: f.options
           });
         }

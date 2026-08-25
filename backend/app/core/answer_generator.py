@@ -170,7 +170,15 @@ Instructions:
         skills = ", ".join(prof.get("skills", ["Python", "FastAPI", "React", "Playwright", "Distributed Systems"])[:5])
         uni = edu.get("university", "Thapar Institute of Engineering & Technology")
         
-        # 1. "Why join [Company]" / "Why do you want to work here"
+        # 1. "Why didn't you get PPO" / "Internship full-time conversion / offer"
+        if any(k in q_lower for k in ["ppo", "return offer", "conversion", "why didn't you get", "why not join amazon"]):
+            return "During my 6-month SDE internship at Amazon Pay, I had a very rewarding stint delivering production microservices and optimizing customer-facing payment platforms. Headcount allocations for full-time return offers were constrained across our business unit for the 2026 fresher batch due to organizational headcount limits. However, I earned strong feedback from my manager and mentors for technical ownership, code quality, and rapid delivery, and I am now actively seeking full-time SDE-1 roles where I can leverage my distributed systems experience."
+
+        # 2. "Proudest thing in your internship / Achievement"
+        if any(k in q_lower for k in ["proud", "proudest", "did in your internship", "internship achievement", "best achievement"]):
+            return "The proudest achievement during my Amazon SDE internship was engineering and optimizing high-throughput backend services that directly improved payment transaction reliability. I took end-to-end ownership of identifying latency bottlenecks, resolving distributed race conditions, and delivering a customer-facing feature ahead of schedule with comprehensive test coverage and zero production regressions."
+
+        # 3. "Why join [Company]" / "Why do you want to work here"
         if any(k in q_lower for k in ["why", "interest", "reason", "motivation", "join", "work here", "work with us", "why us"]):
             if company_info:
                 comp_name = company_info["name"]
@@ -179,15 +187,15 @@ Instructions:
             else:
                 return f"I am deeply excited by this opportunity because of your team's focus on engineering excellence and technical impact. With my background as an SDE Intern at Amazon building scalable cloud microservices and studying Computer Engineering at {uni}, I thrive in high-ownership engineering environments where I can leverage {skills} to build reliable, high-performance systems."
 
-        # 2. "Tell us about a challenging problem / project / bug"
-        if any(k in q_lower for k in ["challenge", "project", "problem", "bug", "difficult", "achievement", "proud"]):
+        # 4. "Tell us about a challenging problem / project / bug"
+        if any(k in q_lower for k in ["challenge", "project", "problem", "bug", "difficult", "achievement"]):
             return f"During my engineering work, one of the most challenging projects I solved was architecting the DevOS autonomous execution engine to control browser sessions via Chrome DevTools Protocol with real-time SSE streaming. The key challenge was handling asynchronous DOM rendering states and complex multi-frame interactions reliably. I implemented resilient state-synchronization protocols and fallback keyboard automation in Python and Playwright, achieving seamless sub-second automation. This experience strengthened my ability to diagnose distributed race conditions and build resilient systems."
 
-        # 3. "Tell us about yourself / Walk through your resume / Background"
+        # 5. "Tell us about yourself / Walk through your resume / Background"
         if any(k in q_lower for k in ["about yourself", "background", "introduce", "summary", "walk us through", "tell us about you"]):
             return f"I am a passionate Software Engineer and Computer Engineering student at {uni} graduating in 2026. I previously worked as an SDE Intern at Amazon, where I engineered scalable cloud microservices and optimized backend API latencies. My core technical strengths span Python, FastAPI, React, Playwright, PostgreSQL, and distributed systems architecture. I love solving hard technical problems with high ownership, from agentic systems to cloud infrastructure."
 
-        # 4. "Why should we hire you / What sets you apart"
+        # 6. "Why should we hire you / What sets you apart"
         if any(k in q_lower for k in ["hire you", "why you", "sets you apart", "strength", "fit for this role"]):
             return f"What sets me apart is my strong combination of algorithmic foundation, hands-on production experience from my Amazon SDE internship, and a bias for rapid execution. I have architected full-stack systems from scratch using {skills} and possess a deep curiosity for high-scale backend engineering. I ramp up quickly, take end-to-end ownership of problems, and deliver robust solutions."
 

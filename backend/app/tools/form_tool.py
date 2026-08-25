@@ -177,7 +177,7 @@ class FormTool:
             if val is not None and val != "":
                 idx = text_input_idx
                 name_str = inp.get("name", "")
-                await browser_tool.fill_input_by_index_or_name(idx, name_str, str(val))
+                await browser_tool.fill_input_by_index_or_name(idx, name_str, str(val), label=label, question_index=q_index)
                 filled_fields.append({
                     "field_label": label,
                     "field_id": inp.get("id"),
@@ -195,9 +195,11 @@ class FormTool:
                 is_open_ended = (
                     field_type == "textarea" or 
                     any(k in label.lower() for k in [
-                        "why", "describe", "about", "project", "tell us", "cover letter", 
+                        "why", "what", "describe", "about", "project", "tell us", "cover letter", 
                         "motivation", "challenge", "background", "experience", "hire", "interest",
-                        "comment", "anything else", "note", "statement", "essay"
+                        "proud", "proudest", "learn", "learned", "struggle", "achievement", "contribution",
+                        "internship", "work", "comment", "anything else", "note", "statement", "essay",
+                        "ppo", "offer", "reason", "strength", "weakness"
                     ])
                 )
 
@@ -207,7 +209,7 @@ class FormTool:
                     idx = text_input_idx
                     name_str = inp.get("name", "")
                     if gen_ans:
-                        await browser_tool.fill_input_by_index_or_name(idx, name_str, gen_ans[:500])
+                        await browser_tool.fill_input_by_index_or_name(idx, name_str, gen_ans[:500], label=label, question_index=q_index)
                     filled_fields.append({
                         "field_label": label,
                         "field_id": inp.get("id"),
@@ -226,6 +228,8 @@ class FormTool:
                         "field_id": inp.get("id"),
                         "reason": "Value not found in profile. Please enter manually.",
                         "fieldType": "text",
+                        "index": text_input_idx,
+                        "name": inp.get("name", ""),
                         "questionIndex": q_index
                     })
 
@@ -314,27 +318,29 @@ class FormTool:
             ft = f.get("fieldType", "text")
             val = f.get("value", "")
 
-            if ft == "text" and val and not val.startswith("[ATTACHED FILE]"):
+            if ft == "text" and val and not str(val).startswith("[ATTACHED FILE]"):
                 f_idx = f.get("index", text_idx)
                 f_name = f.get("name", "")
-                await browser_tool.fill_input_by_index_or_name(f_idx, f_name, val)
+                f_label = f.get("field_label", "")
+                f_qidx = f.get("questionIndex")
+                await browser_tool.fill_input_by_index_or_name(f_idx, f_name, str(val), label=f_label, question_index=f_qidx)
                 text_idx += 1
 
             elif ft == "radio" and val:
                 q_idx = f.get("questionIndex", 0)
                 label = f.get("field_label", "")
-                await browser_tool.select_radio_option(q_idx, val, label)
+                await browser_tool.select_radio_option(q_idx, str(val), label)
 
             elif ft == "checkbox" and val:
                 q_idx = f.get("questionIndex", 0)
                 label = f.get("field_label", "")
-                selected_opts = [v.strip() for v in val.split(",")]
+                selected_opts = [v.strip() for v in str(val).split(",")]
                 await browser_tool.select_checkbox_options(q_idx, selected_opts, label)
 
             elif ft == "dropdown" and val:
                 q_idx = f.get("questionIndex", 0)
                 label = f.get("field_label", "")
-                await browser_tool.select_dropdown_option(q_idx, val, label)
+                await browser_tool.select_dropdown_option(q_idx, str(val), label)
 
         # Step 2: Upload resume ONLY if not already attached on page
         selected_res = approval_payload.get("selected_resume") if approval_payload else None
