@@ -721,7 +721,9 @@ class BrowserTool:
             # Method 2: Google Forms — click 'Add file' which opens a Google Picker iframe dialog
             add_btn = await self.page.query_selector(
                 'div[role="button"][aria-label*="Add file"], '
+                'div[role="button"][aria-label*="Add File"], '
                 'div[role="button"]:has-text("Add file"), '
+                'div[role="button"]:has-text("Add File"), '
                 'span:has-text("Add file"), '
                 'span:has-text("Add File")'
             )
@@ -731,120 +733,95 @@ class BrowserTool:
                 return False
 
             logger.info("[Upload] Found 'Add file' button, clicking...")
+            await add_btn.scroll_into_view_if_needed()
             await add_btn.click()
-            await asyncio.sleep(3.0)
+            await asyncio.sleep(2.5)
 
-            # The Google Picker opens as an iframe dialog on the SAME page
-            # Find the picker iframe (src contains "docs.google.com/picker")
+            # Wait for picker iframe to appear
             picker_frame = None
-            for frame in self.page.frames:
-                if "docs.google.com/picker" in frame.url or "picker" in frame.url:
-                    picker_frame = frame
-                    logger.info(f"[Upload] Found Google Picker iframe: {frame.url[:80]}...")
+            for _ in range(8):
+                for frame in self.page.frames:
+                    if "docs.google.com/picker" in frame.url or "picker" in frame.url or "google.com/picker" in frame.url:
+                        picker_frame = frame
+                        break
+                if picker_frame:
                     break
+                await asyncio.sleep(0.5)
 
             if not picker_frame:
                 # Try finding iframe element directly
                 iframe_el = await self.page.query_selector('iframe[src*="picker"], iframe[src*="docs.google.com"]')
                 if iframe_el:
                     picker_frame = await iframe_el.content_frame()
-                    logger.info("[Upload] Found picker iframe via element query")
 
-            if not picker_frame:
-                logger.warning("[Upload] Could not find Google Picker iframe")
-                # Last resort: try file chooser on page level
+            if picker_frame:
+                logger.info(f"[Upload] Found Google Picker iframe: {picker_frame.url[:80]}...")
+                
+                # Try direct file input inside iframe first (instant & reliable)
                 try:
-                    async with self.page.expect_file_chooser(timeout=5000) as fc_info:
-                        # Try clicking Browse if it's on the main page
-                        browse = await self.page.query_selector('button:has-text("Browse")')
-                        if browse:
-                            await browse.click()
-                    file_chooser = await fc_info.value
-                    await file_chooser.set_files(file_path)
-                    logger.info("[Upload] ✅ Uploaded via main page file chooser")
-                    await asyncio.sleep(5.0)
-                    return True
-                except Exception:
-                    pass
-                return False
+                    file_input = await picker_frame.wait_for_selector('input[type="file"]', timeout=3000)
+                    if file_input:
+                        await file_input.set_input_files(file_path)
+                        logger.info(f"[Upload] ✅ Staged file via picker iframe input[type=file]: {os.path.basename(file_path)}")
+                        await asyncio.sleep(4.0)
 
-            # Inside the picker iframe, find and click the "Browse" button
-            # File choosers bubble up to the PAGE level even from iframes
-            browse_btn = None
-            browse_selectors = [
-                'button:has-text("Browse")',
-                'div[role="button"]:has-text("Browse")',
-                'span:has-text("Browse")',
-                '.picker-upload-button',
-            ]
-            for sel in browse_selectors:
-                try:
-                    browse_btn = await picker_frame.wait_for_selector(sel, timeout=5000)
-                    if browse_btn:
-                        logger.info(f"[Upload] Found Browse button in iframe: {sel}")
-                        break
-                except Exception:
-                    continue
-
-            if not browse_btn:
-                logger.warning("[Upload] Could not find Browse button inside picker iframe")
-                # Try hidden file input inside iframe
-                try:
-                    frame_file_input = await picker_frame.query_selector('input[type="file"]')
-                    if frame_file_input:
-                        await frame_file_input.set_input_files(file_path)
-                        logger.info("[Upload] ✅ Uploaded via iframe's input[type=file]")
-                        await asyncio.sleep(5.0)
+                        # Click Upload button inside iframe if present
+                        upload_btn = await picker_frame.query_selector('button:has-text("Upload"), div[role="button"]:has-text("Upload"), div[aria-label*="Upload"], .picker-action-button')
+                        if upload_btn:
+                            await upload_btn.click()
+                            logger.info("[Upload] Clicked Upload confirmation button inside picker.")
+                            await asyncio.sleep(4.0)
                         return True
-                except Exception:
-                    pass
-                return False
+                except Exception as frame_err:
+                    logger.debug(f"[Upload] Direct iframe file input: {frame_err}")
 
-            # Click Browse and handle the native file chooser
-            # IMPORTANT: expect_file_chooser must be on the PAGE level, not the frame
-            try:
-                async with self.page.expect_file_chooser(timeout=10000) as fc_info:
-                    await browse_btn.click()
-                file_chooser = await fc_info.value
-                await file_chooser.set_files(file_path)
-                logger.info(f"[Upload] ✅ File selected via Browse button: {os.path.basename(file_path)}")
-            except Exception as fc_err:
-                logger.error(f"[Upload] File chooser from Browse failed: {fc_err}")
-                return False
-
-            # Wait for the file to upload to Google Drive (progress bar shows)
-            logger.info("[Upload] Waiting for file to upload to Google Drive...")
-            await asyncio.sleep(10.0)
-
-            # Click 'Upload' button inside the picker iframe to confirm
-            try:
-                upload_confirm = None
-                upload_selectors = [
-                    'button:has-text("Upload")',
-                    'div[role="button"]:has-text("Upload")',
-                    '#picker\\:ap\\:2',
+                # Fallback: Find and click Browse button inside picker iframe
+                browse_selectors = [
+                    'button:has-text("Browse")',
+                    'div[role="button"]:has-text("Browse")',
+                    'span:has-text("Browse")',
+                    '.picker-upload-button',
                 ]
-                for sel in upload_selectors:
+                browse_btn = None
+                for sel in browse_selectors:
                     try:
-                        upload_confirm = await picker_frame.wait_for_selector(sel, timeout=5000)
-                        if upload_confirm:
+                        browse_btn = await picker_frame.wait_for_selector(sel, timeout=2000)
+                        if browse_btn:
                             break
                     except Exception:
                         continue
 
-                if upload_confirm:
-                    await upload_confirm.click()
-                    logger.info("[Upload] Clicked Upload confirm button")
-                    await asyncio.sleep(5.0)
-                else:
-                    logger.info("[Upload] No Upload confirm button found — file may auto-attach")
-            except Exception as e:
-                logger.debug(f"[Upload] Upload confirm click issue: {e}")
+                if browse_btn:
+                    try:
+                        async with self.page.expect_file_chooser(timeout=8000) as fc_info:
+                            await browse_btn.click()
+                        file_chooser = await fc_info.value
+                        await file_chooser.set_files(file_path)
+                        logger.info(f"[Upload] ✅ File selected via Browse chooser: {os.path.basename(file_path)}")
+                        await asyncio.sleep(4.0)
 
-            # Wait for the picker dialog to close and the file to attach
-            await asyncio.sleep(3.0)
-            logger.info("[Upload] ✅ File upload completed successfully")
-            return True
+                        # Click Upload confirm if present
+                        upload_btn = await picker_frame.query_selector('button:has-text("Upload"), div[role="button"]:has-text("Upload"), div[aria-label*="Upload"]')
+                        if upload_btn:
+                            await upload_btn.click()
+                            await asyncio.sleep(3.0)
+                        return True
+                    except Exception as e:
+                        logger.warning(f"[Upload] Browse click chooser error: {e}")
+
+            # Fallback Method 3: Page-level file chooser
+            try:
+                async with self.page.expect_file_chooser(timeout=4000) as fc_info:
+                    await add_btn.click()
+                file_chooser = await fc_info.value
+                await file_chooser.set_files(file_path)
+                logger.info("[Upload] ✅ Uploaded via page file chooser")
+                await asyncio.sleep(3.0)
+                return True
+            except Exception:
+                pass
+
+            return False
 
         except Exception as e:
             logger.error(f"[Upload] Fatal error: {e}")

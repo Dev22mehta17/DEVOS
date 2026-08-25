@@ -197,6 +197,11 @@ class CampaignScheduler:
             f"[Scheduler] Campaign {campaign_id} scheduled with {len(jobs)} jobs. "
             f"Execution: {schedule_display}"
         )
+
+        # If sending immediately, trigger processing instantly without waiting for loop
+        if not schedule_time:
+            asyncio.create_task(self._process_due_jobs())
+
         return campaign_id
 
     def get_campaign_status(self, campaign_id: str) -> Optional[Dict[str, Any]]:
@@ -225,7 +230,7 @@ class CampaignScheduler:
     # BACKGROUND WORKER
     # ───────────────────────────────────────
     async def start_worker(self):
-        """Start the background worker that checks for due jobs every 30 seconds."""
+        """Start the background worker that checks for due jobs every 5 seconds."""
         if self._worker_running:
             logger.warning("[Scheduler] Worker already running.")
             return
@@ -239,13 +244,13 @@ class CampaignScheduler:
             except Exception as e:
                 logger.error(f"[Scheduler] Worker loop error: {e}")
 
-            await asyncio.sleep(30)  # Check every 30 seconds
+            await asyncio.sleep(5)  # Check every 5 seconds for fast execution
 
     async def _process_due_jobs(self):
         """Find and execute all due jobs across all campaigns."""
         now = datetime.now()
 
-        for campaign_id, campaign in self.campaigns.items():
+        for campaign_id, campaign in list(self.campaigns.items()):
             if campaign.status in ("COMPLETED", "CANCELLED"):
                 continue
 
@@ -283,15 +288,14 @@ class CampaignScheduler:
                     campaign.get_status_summary()
                 )
 
-            # Execute pending jobs with rate limiting (1 per 15s)
+            # Execute pending jobs with fast interval (4s)
             for job in pending_jobs:
                 # Check retry backoff
                 if job.status == "RETRY" and job.attempts > 0:
-                    # Simple 60s backoff between retries
                     if job.sent_at:
                         try:
                             last_attempt = datetime.fromisoformat(job.sent_at)
-                            if (now - last_attempt).total_seconds() < 60:
+                            if (now - last_attempt).total_seconds() < 30:
                                 continue
                         except (ValueError, TypeError):
                             pass
@@ -306,8 +310,8 @@ class CampaignScheduler:
                     campaign.get_status_summary()
                 )
 
-                # Rate limit: 15 seconds between sends
-                await asyncio.sleep(15)
+                # Rate limit: 4 seconds between sends
+                await asyncio.sleep(4)
 
     async def _execute_job(self, job: CampaignJob, campaign: Campaign):
         """Execute a single email job via Gmail."""
