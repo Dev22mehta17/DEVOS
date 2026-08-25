@@ -21,7 +21,7 @@ from app.tools.universal_web_tool import universal_web_tool
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="JARVIS Personal Computer Agent Backend", version="2.0.0")
+app = FastAPI(title="DevOS Personal Computer Agent Backend", version="2.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -60,7 +60,7 @@ from app.agent.executor import agent_executor, set_event_broadcaster
 
 @app.on_event("startup")
 async def startup_event():
-    logger.info("Starting JARVIS Local Execution Engine with Agent Core...")
+    logger.info("Starting DevOS Local Execution Engine with Agent Core...")
     set_event_broadcaster(push_stream_event)
     asyncio.create_task(browser_tool.initialize())
 

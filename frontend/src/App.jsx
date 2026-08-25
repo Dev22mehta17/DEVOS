@@ -158,7 +158,7 @@ export default function App() {
             <Cpu color="#fff" size={22} />
           </div>
           <div>
-            <div className="logo-title">JARVIS — DevOS</div>
+            <div className="logo-title">DevOS</div>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
               Personal Computer Agent • Chrome Browser & OS Control
             </div>
@@ -195,7 +195,7 @@ export default function App() {
         <div className="main-column">
           {/* Goal Entry Card */}
           <div className="glass-panel prompt-card">
-            <div className="prompt-title">What would you like JARVIS to do on your Mac?</div>
+            <div className="prompt-title">What would you like DevOS to do on your Mac?</div>
             <div className="prompt-input-wrapper">
               <input
                 className="prompt-input"

@@ -42,7 +42,7 @@ class MemoryEngine:
         try:
             import chromadb
             self.db_client = chromadb.Client()
-            self.collection = self.db_client.get_or_create_collection(name="jarvis_memory")
+            self.collection = self.db_client.get_or_create_collection(name="devos_memory")
             self._seed_initial_context()
             logger.info("ChromaDB vector memory initialized.")
         except Exception as e:
