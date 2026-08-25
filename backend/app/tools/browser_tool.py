@@ -354,7 +354,7 @@ class BrowserTool:
             return False
         try:
             success = await self.page.evaluate("""([idx, nameStr, valStr, labelStr, qIdx]) => {
-                const cleanStr = (s) => (s || '').toLowerCase().replace(/[*?:\n\r\t,._()\-]+/g, ' ').replace(/\s+/g, ' ').trim();
+                const cleanStr = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
                 const targetLabel = cleanStr(labelStr);
                 const labelWords = targetLabel.split(' ').filter(w => w.length > 2);
 
@@ -434,7 +434,7 @@ class BrowserTool:
         try:
             success = await self.page.evaluate("""([qIdx, optText, qLabel]) => {
                 const optClean = (optText || '').toLowerCase().trim();
-                const cleanStr = (s) => (s || '').toLowerCase().replace(/[*?:\n\r\t,._()\-]+/g, ' ').replace(/\s+/g, ' ').trim();
+                const cleanStr = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
                 const targetLabel = cleanStr(qLabel);
                 const labelWords = targetLabel.split(' ').filter(w => w.length > 2);
 
