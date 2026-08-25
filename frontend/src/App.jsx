@@ -7,6 +7,8 @@ import MemoryManager from './components/MemoryManager';
 import SearchAnswerCard from './components/SearchAnswerCard';
 import ResearchDossierCard from './components/ResearchDossierCard';
 import RecruiterQueueModal from './components/RecruiterQueueModal';
+import CampaignPreviewModal from './components/CampaignPreviewModal';
+import CampaignTrackerCard from './components/CampaignTrackerCard';
 
 export default function App() {
   const [goal, setGoal] = useState('');
@@ -17,6 +19,8 @@ export default function App() {
   const [searchResult, setSearchResult] = useState(null);
   const [dossierResult, setDossierResult] = useState(null);
   const [recruiterQueue, setRecruiterQueue] = useState(null);
+  const [campaignPreview, setCampaignPreview] = useState(null);
+  const [campaignTracker, setCampaignTracker] = useState(null);
   const [profile, setProfile] = useState({});
 
   // 1. Listen to SSE live step stream
@@ -30,7 +34,16 @@ export default function App() {
 
         setLogs((prev) => [...prev, data]);
 
-        if (data.step_type === 'RESEARCH_DOSSIER') {
+        if (data.step_type === 'CAMPAIGN_PREVIEW') {
+          if (data.details) {
+            setCampaignPreview(data.details);
+          }
+          setIsProcessing(false);
+        } else if (data.step_type === 'CAMPAIGN_PROGRESS') {
+          if (data.details) {
+            setCampaignTracker(data.details);
+          }
+        } else if (data.step_type === 'RESEARCH_DOSSIER') {
           if (data.details) {
             setDossierResult(data.details);
           }
@@ -116,6 +129,7 @@ export default function App() {
       });
       setPendingEmail(null);
       setPendingForm(null);
+      setCampaignPreview(null);
     } catch (err) {
       console.error('Approve error:', err);
     }
@@ -130,8 +144,20 @@ export default function App() {
       });
       setPendingEmail(null);
       setPendingForm(null);
+      setCampaignPreview(null);
     } catch (err) {
       console.error('Reject error:', err);
+    }
+  };
+
+  const handleCancelCampaign = async (campaignId) => {
+    try {
+      await fetch(`http://localhost:8000/api/campaign/cancel/${campaignId}`, {
+        method: 'POST',
+      });
+      setCampaignTracker((prev) => prev ? { ...prev, status: 'CANCELLED' } : null);
+    } catch (err) {
+      console.error('Cancel campaign error:', err);
     }
   };
 
@@ -190,8 +216,9 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Grid */}
-      <div className="dashboard-grid">
+      {/* Main Grid Layout */}
+      <div className="app-main-grid">
+        {/* Left Column: Command & Live Execution Feed */}
         <div className="main-column">
           {/* Goal Entry Card */}
           <div className="glass-panel prompt-card">
@@ -199,53 +226,32 @@ export default function App() {
             <div className="prompt-input-wrapper">
               <input
                 className="prompt-input"
-                placeholder="e.g. Open Mail and send an email to Dev on mehtadev2004@gmail.com..."
+                placeholder="e.g. 'Send my intro to ananya@atlys.com (AI Engineer), rahul@microsoft.com (Backend)' or 'Compare Stripe vs Razorpay'"
                 value={goal}
                 onChange={(e) => setGoal(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleExecute()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleExecute();
+                }}
+                disabled={isProcessing}
               />
               <button
-                className="action-btn"
+                className="prompt-btn"
                 onClick={() => handleExecute()}
-                disabled={isProcessing}
+                disabled={isProcessing || !goal.trim()}
               >
-                <Sparkles size={18} /> Execute Goal
+                <Send size={16} />
               </button>
             </div>
 
-            {/* Quick Presets */}
-            <div className="chips-row" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+            {/* Quick Action Preset Chips */}
+            <div className="preset-chips-container">
               <button
                 className="chip-btn"
                 onClick={() => {
-                  setGoal("Reply to the latest email from recruiter confirming my availability tomorrow and attach my resume");
+                  setGoal("Send my intro to ananya@atlys.com (AI Engineer at Atlys), rahul@microsoft.com (Backend SDE at Microsoft), priya@google.com (ML Engineer at Google) tomorrow at 10 AM");
                 }}
               >
-                ✉️ Gmail: Find & Reply to Recruiter
-              </button>
-              <button
-                className="chip-btn"
-                onClick={() => {
-                  setGoal("Forward interview email to rahul@example.com with an explanation note");
-                }}
-              >
-                📬 Gmail: Forward with Note
-              </button>
-              <button
-                className="chip-btn"
-                onClick={() => {
-                  setGoal("Fill job application form at https://<paste-form-url-here> with my profile and attach Dev_Resume.pdf");
-                }}
-              >
-                📝 Form: Auto-fill Application (Paste URL)
-              </button>
-              <button
-                className="chip-btn"
-                onClick={() => {
-                  setGoal("Register me for the conference at https://<paste-url> using my profile details");
-                }}
-              >
-                🌐 Web: Universal Registration
+                📧 Campaign: "Bulk Recruiter Outreach (3 targets)"
               </button>
               <button
                 className="chip-btn"
@@ -263,6 +269,14 @@ export default function App() {
               >
                 📬 Proactive: "Recruiter Inbox Triage Queue"
               </button>
+              <button
+                className="chip-btn"
+                onClick={() => {
+                  setGoal("Fill out the job application form at https://<paste-url> with my resume");
+                }}
+              >
+                📝 Form: Auto-fill Application
+              </button>
             </div>
           </div>
 
@@ -278,6 +292,13 @@ export default function App() {
             onClose={() => setDossierResult(null)}
           />
 
+          {/* Real-time Campaign Delivery Tracker Card */}
+          <CampaignTrackerCard
+            campaignStatus={campaignTracker}
+            onCancel={handleCancelCampaign}
+            onClose={() => setCampaignTracker(null)}
+          />
+
           {/* Antigravity Step Feed */}
           <StepStream logs={logs} isProcessing={isProcessing} />
         </div>
@@ -289,6 +310,11 @@ export default function App() {
       </div>
 
       {/* HITL Modals */}
+      <CampaignPreviewModal
+        campaignData={campaignPreview}
+        onApprove={handleApproveAction}
+        onReject={handleRejectAction}
+      />
       <EmailPreviewModal
         emailData={pendingEmail}
         onApprove={handleApproveAction}

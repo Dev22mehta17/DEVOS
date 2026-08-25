@@ -295,7 +295,17 @@ body {
 .badge-MEMORY_QUERY { background: rgba(127, 0, 255, 0.15); color: var(--accent-purple); }
 .badge-FILE_SEARCH { background: rgba(255, 171, 0, 0.15); color: var(--accent-amber); }
 .badge-APPROVAL_REQUIRED { background: rgba(255, 23, 68, 0.2); color: var(--accent-rose); border: 1px solid rgba(255, 23, 68, 0.4); }
+.badge-CAMPAIGN_PREVIEW { background: rgba(0, 242, 254, 0.2); color: var(--accent-cyan); border: 1px solid rgba(0, 242, 254, 0.4); }
+.badge-CAMPAIGN_PROGRESS { background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4); }
 .badge-COMPLETED { background: rgba(0, 230, 118, 0.15); color: var(--accent-emerald); }
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.spin {
+  animation: spin 1s linear infinite;
+}
 
 .log-msg {
   color: var(--text-main);

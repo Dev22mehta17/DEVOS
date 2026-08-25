@@ -57,12 +57,15 @@ class GenerateAnswerRequest(BaseModel):
     max_words: Optional[int] = 150
 
 from app.agent.executor import agent_executor, set_event_broadcaster
+from app.tools.campaign_scheduler import campaign_scheduler
 
 @app.on_event("startup")
 async def startup_event():
     logger.info("Starting DevOS Local Execution Engine with Agent Core...")
     set_event_broadcaster(push_stream_event)
+    campaign_scheduler.set_event_broadcaster(push_stream_event)
     asyncio.create_task(browser_tool.initialize())
+    asyncio.create_task(campaign_scheduler.start_worker())
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -141,7 +144,23 @@ async def execute_goal(req: GoalRequest):
 async def approve_action(req: ActionApprovalRequest):
     await push_stream_event("THINKING", f"User approved action {req.action_id}. Proceeding to final execution...")
     
-    if "email" in req.action_id or "pipeline" in req.action_id:
+    if "campaign" in req.action_id:
+        # Schedule the full email campaign in the persistent job scheduler
+        payload = req.payload or {}
+        campaign_id = campaign_scheduler.schedule_campaign(payload)
+        status = campaign_scheduler.get_campaign_status(campaign_id)
+        
+        schedule_display = payload.get("schedule_display", "Immediately")
+        total = payload.get("total_recipients", len(payload.get("drafts", [])))
+        
+        await push_stream_event(
+            "CAMPAIGN_PROGRESS",
+            f"✅ Campaign scheduled! {total} personalized emails queued ({schedule_display}).",
+            status
+        )
+        return {"status": "SCHEDULED", "campaign_id": campaign_id, "details": status}
+
+    elif "email" in req.action_id or "pipeline" in req.action_id:
         res = await gmail_tool.send_draft(req.action_id, req.payload)
         if res.get("sent_on_chrome"):
             await push_stream_event("COMPLETED", f"✅ Email sent live on Gmail! {res.get('message', '')}")
@@ -161,6 +180,29 @@ async def approve_action(req: ActionApprovalRequest):
 
 @app.post("/api/reject")
 async def reject_action(req: ActionApprovalRequest):
-    permission_engine.reject_action(req.action_id)
-    await push_stream_event("COMPLETED", f"Action {req.action_id} was rejected by user. Execution halted.")
-    return {"status": "REJECTED", "action_id": req.action_id}
+    if "campaign" in req.action_id:
+        campaign_scheduler.cancel_campaign(req.action_id)
+        await push_stream_event("COMPLETED", f"Campaign {req.action_id} was cancelled by user.")
+        return {"status": "CANCELLED", "action_id": req.action_id}
+    else:
+        permission_engine.reject_action(req.action_id)
+        await push_stream_event("COMPLETED", f"Action {req.action_id} was rejected by user. Execution halted.")
+        return {"status": "REJECTED", "action_id": req.action_id}
+
+@app.get("/api/campaign/status/{campaign_id}")
+async def get_campaign_status(campaign_id: str):
+    """Retrieve live status, sent counts, and per-recipient job states for a campaign."""
+    status = campaign_scheduler.get_campaign_status(campaign_id)
+    if not status:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    return status
+
+@app.post("/api/campaign/cancel/{campaign_id}")
+async def cancel_campaign(campaign_id: str):
+    """Cancel any pending or scheduled jobs in a campaign."""
+    success = campaign_scheduler.cancel_campaign(campaign_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    await push_stream_event("CAMPAIGN_PROGRESS", f"Campaign {campaign_id} was cancelled.", {"campaign_id": campaign_id, "status": "CANCELLED"})
+    return {"status": "CANCELLED", "campaign_id": campaign_id}
+

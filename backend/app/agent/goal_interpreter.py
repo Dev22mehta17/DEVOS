@@ -116,6 +116,27 @@ class GoalInterpreter:
                 "original_prompt": text_clean,
                 "requires_hitl": True
             }
+        # ─── Case 3.5: Email Campaign (Bulk Personalized Outreach) ───
+        # Detect: multiple email addresses, or campaign keywords + email context
+        email_addresses = re.findall(r'[\w\.\-\+]+@[\w\.\-]+\.\w+', text_clean)
+        campaign_keywords = [
+            "send to all", "send to these", "send each", "send intro to",
+            "bulk email", "email campaign", "mail all", "send introduction",
+            "send my intro", "mail to all", "mail these", "personalize",
+            "send to the following", "send to following", "send emails to"
+        ]
+        is_campaign = (
+            len(email_addresses) >= 2 or
+            any(k in text_lower for k in campaign_keywords)
+        )
+        if is_campaign:
+            return {
+                "goal_type": GoalType.EMAIL_CAMPAIGN,
+                "action_kind": "BULK_CAMPAIGN",
+                "recipients_raw": email_addresses,
+                "original_prompt": text_clean,
+                "requires_hitl": True
+            }
 
         # ─── Case 4: Gmail Single Action (Reply / Forward / Compose) ───
         if _has_any_word(text_lower, ["email", "mail", "gmail", "inbox", "recruiter", "hr"]):

@@ -1,0 +1,71 @@
+{
+  "campaign_db7905a6": {
+    "campaign_id": "campaign_db7905a6",
+    "title": "Recruiter Outreach (3 emails)",
+    "total_jobs": 3,
+    "scheduled_at": "2026-08-27T10:00:00",
+    "schedule_display": "Aug 27, 10:00 AM",
+    "status": "SCHEDULED",
+    "jobs": [
+      {
+        "job_id": "job_ad35aeb9",
+        "campaign_id": "campaign_db7905a6",
+        "draft_index": 0,
+        "email": "ananya@atlys.com",
+        "name": "Ananya",
+        "company": "Atlys",
+        "role": "AI Engineer",
+        "subject": "Application for AI Engineer \u2013 Dev Mehta",
+        "body": "Hi Ananya,\n\nI hope you're doing well.\n\nI'm Dev Mehta, a Computer Engineering graduate from Thapar Institute of Engineering & Technology. I recently completed a 6-month Software Development Engineer internship at Amazon Pay India, where I worked on production systems and customer-facing features for a large-scale payment platform. I gained hands-on experience in software development, backend systems, debugging, and delivering reliable features in a production environment.\n\nI came across the AI Engineer opportunity at Atlys and would be very interested in being considered for the role.\n\nI have hands-on experience with Python, TensorFlow, and building ML pipelines, with a strong foundation in mathematics, statistics, and algorithm design. During my time at Amazon, I worked with data-driven systems and gained exposure to production-scale infrastructure that powers intelligent features.\n\nPlease find my updated resume attached for your consideration. I'd be grateful for the opportunity to discuss my profile further.\n\nThank you for your time and consideration.\n\nBest regards,\nDev Mehta\n\ud83d\udce7 mehtadev2004@gmail.com\n\ud83d\udcf1 +91-7206049507\n\ud83d\udd17 GitHub: https://github.com/Dev22mehta17\n\ud83d\udd17 LinkedIn: https://linkedin.com/in/DevMehta",
+        "attached_file": "/Users/devmehta/Agent_mac/backend/uploads/DevMehta_CV.pdf",
+        "scheduled_at": "2026-08-27T10:00:00",
+        "status": "PENDING",
+        "attempts": 0,
+        "max_retries": 2,
+        "sent_at": null,
+        "error_message": null,
+        "created_at": "2026-08-26T02:21:33.776468"
+      },
+      {
+        "job_id": "job_55273b16",
+        "campaign_id": "campaign_db7905a6",
+        "draft_index": 1,
+        "email": "rahul@microsoft.com",
+        "name": "Rahul",
+        "company": "Microsoft",
+        "role": "Backend SDE",
+        "subject": "Application for Backend SDE \u2013 Dev Mehta",
+        "body": "Hi Rahul,\n\nI hope you're doing well.\n\nI'm Dev Mehta, a Computer Engineering graduate from Thapar Institute of Engineering & Technology. I recently completed a 6-month Software Development Engineer internship at Amazon Pay India, where I worked on production systems and customer-facing features for a large-scale payment platform. I gained hands-on experience in software development, backend systems, debugging, and delivering reliable features in a production environment.\n\nI came across the Backend SDE opportunity at Microsoft and would be very interested in being considered for the role.\n\nI have strong proficiency in Java, Python, and building scalable backend microservices, with hands-on experience in REST API design, database optimization, and distributed systems. At Amazon, I worked on high-throughput payment processing services handling millions of transactions in a production environment.\n\nPlease find my updated resume attached for your consideration. I'd be grateful for the opportunity to discuss my profile further.\n\nThank you for your time and consideration.\n\nBest regards,\nDev Mehta\n\ud83d\udce7 mehtadev2004@gmail.com\n\ud83d\udcf1 +91-7206049507\n\ud83d\udd17 GitHub: https://github.com/Dev22mehta17\n\ud83d\udd17 LinkedIn: https://linkedin.com/in/DevMehta",
+        "attached_file": "/Users/devmehta/Agent_mac/backend/uploads/DevMehta_CV.pdf",
+        "scheduled_at": "2026-08-27T10:00:00",
+        "status": "PENDING",
+        "attempts": 0,
+        "max_retries": 2,
+        "sent_at": null,
+        "error_message": null,
+        "created_at": "2026-08-26T02:21:33.776487"
+      },
+      {
+        "job_id": "job_6a3efea9",
+        "campaign_id": "campaign_db7905a6",
+        "draft_index": 2,
+        "email": "priya@google.com",
+        "name": "Priya",
+        "company": "Google",
+        "role": "ML Engineer",
+        "subject": "Application for ML Engineer \u2013 Dev Mehta",
+        "body": "Hi Priya,\n\nI hope you're doing well.\n\nI'm Dev Mehta, a Computer Engineering graduate from Thapar Institute of Engineering & Technology. I recently completed a 6-month Software Development Engineer internship at Amazon Pay India, where I worked on production systems and customer-facing features for a large-scale payment platform. I gained hands-on experience in software development, backend systems, debugging, and delivering reliable features in a production environment.\n\nI came across the ML Engineer opportunity at Google and would be very interested in being considered for the role.\n\nI have hands-on experience with Python, TensorFlow, and building ML pipelines, with a strong foundation in mathematics, statistics, and algorithm design. During my time at Amazon, I worked with data-driven systems and gained exposure to production-scale infrastructure that powers intelligent features.\n\nPlease find my updated resume attached for your consideration. I'd be grateful for the opportunity to discuss my profile further.\n\nThank you for your time and consideration.\n\nBest regards,\nDev Mehta\n\ud83d\udce7 mehtadev2004@gmail.com\n\ud83d\udcf1 +91-7206049507\n\ud83d\udd17 GitHub: https://github.com/Dev22mehta17\n\ud83d\udd17 LinkedIn: https://linkedin.com/in/DevMehta",
+        "attached_file": "/Users/devmehta/Agent_mac/backend/uploads/DevMehta_CV.pdf",
+        "scheduled_at": "2026-08-27T10:00:00",
+        "status": "PENDING",
+        "attempts": 0,
+        "max_retries": 2,
+        "sent_at": null,
+        "error_message": null,
+        "created_at": "2026-08-26T02:21:33.776499"
+      }
+    ],
+    "created_at": "2026-08-26T02:21:33.776508",
+    "completed_at": null
+  }
+}

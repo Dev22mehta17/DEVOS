@@ -129,6 +129,53 @@ class Planner:
                 )
             ]
 
+        # ─── 3.5. Email Campaign Plan ───
+        elif goal_type == GoalType.EMAIL_CAMPAIGN:
+            steps = [
+                TaskStep(
+                    step_index=1,
+                    title="Extract Recipients & Roles",
+                    description="Parsing email addresses, names, companies, and roles from prompt",
+                    action_type="PARSE_RECIPIENTS",
+                    payload=interpreted_goal
+                ),
+                TaskStep(
+                    step_index=2,
+                    title="Match Role-Specific Skills",
+                    description="Selecting skill lines based on role type (ML/Backend/Frontend/General)",
+                    action_type="MATCH_SKILLS",
+                    payload={}
+                ),
+                TaskStep(
+                    step_index=3,
+                    title="Populate Email Templates",
+                    description="Filling master template with personalized name, company, role, and skill lines",
+                    action_type="POPULATE_TEMPLATE",
+                    payload={}
+                ),
+                TaskStep(
+                    step_index=4,
+                    title="Campaign Preview for Approval",
+                    description="Presenting all personalized email drafts for user review",
+                    action_type="STAGING_HITL",
+                    payload={"requires_approval": True}
+                ),
+                TaskStep(
+                    step_index=5,
+                    title="Schedule Campaign Jobs",
+                    description="Enqueueing approved emails into the persistent job scheduler",
+                    action_type="SCHEDULE_CAMPAIGN",
+                    payload={}
+                ),
+                TaskStep(
+                    step_index=6,
+                    title="Execute & Track Delivery",
+                    description="Background worker sends emails at scheduled time with rate limiting",
+                    action_type="EXECUTE_CAMPAIGN",
+                    payload={}
+                )
+            ]
+
         # ─── 4. Gmail Action Plan ───
         elif goal_type == GoalType.GMAIL_ACTION:
             action_kind = interpreted_goal.get("action_kind", "COMPOSE")

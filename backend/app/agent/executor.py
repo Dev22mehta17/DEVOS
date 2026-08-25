@@ -14,6 +14,8 @@ from app.tools.gmail_tool import gmail_tool
 from app.tools.universal_web_tool import universal_web_tool
 from app.tools.deep_research_tool import deep_research_tool
 from app.tools.recruiter_pipeline_tool import recruiter_pipeline_tool
+from app.tools.email_campaign_tool import email_campaign_tool
+from app.tools.campaign_scheduler import campaign_scheduler
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +114,30 @@ class AgentExecutor:
                 await emit_agent_event("DOM_ACTION", f"Step 2/3: Triaged {total_items} recruiter threads into action categories & tailored draft replies.")
                 await emit_agent_event("RECRUITER_QUEUE", f"Step 3/3: Recruiter Triage Queue ready ({total_items} pending actions). Review in drawer.", pipeline_data)
                 return pipeline_data
+
+            # ─── C2. Email Campaign Workflow ───
+            elif goal_type == GoalType.EMAIL_CAMPAIGN:
+                await emit_agent_event("THINKING", "Step 1/4: Parsing recipient emails, names, companies, and roles from your message...")
+                
+                campaign_data = await email_campaign_tool.prepare_campaign(goal_text)
+                
+                if campaign_data.get("status") == "NO_RECIPIENTS":
+                    await emit_agent_event("COMPLETED", f"⚠️ {campaign_data['message']}")
+                    return campaign_data
+
+                total = campaign_data.get("total_recipients", 0)
+                schedule = campaign_data.get("schedule_display", "Immediately")
+                
+                # Show skill profile breakdown
+                profiles_used = set()
+                for d in campaign_data.get("drafts", []):
+                    profiles_used.add(d.get("skill_profile", "general_sde"))
+                profile_summary = ", ".join(p.replace("_", "/").title() for p in profiles_used)
+                
+                await emit_agent_event("DOM_ACTION", f"Step 2/4: Matched role-specific skill lines ({profile_summary}) for {total} recipients.")
+                await emit_agent_event("DOM_ACTION", f"Step 3/4: Populated personalized email templates with name, company, role, and skills.")
+                await emit_agent_event("CAMPAIGN_PREVIEW", f"Step 4/4: Campaign ready — {total} personalized emails. Schedule: {schedule}. Review below.", campaign_data)
+                return campaign_data
 
             # ─── D. Single Gmail Action Workflow ───
             elif goal_type == GoalType.GMAIL_ACTION:
