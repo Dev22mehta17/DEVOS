@@ -325,22 +325,75 @@ class GmailTool:
                 except Exception as attach_err:
                     logger.warning(f"[Gmail] File attach error: {attach_err}")
 
-            # Step 6: Click Send
+            # Step 6: Click Send or Native Gmail Schedule Send
+            schedule_time = payload.get("schedule_time") if payload else None
             send_clicked = False
-            send_selectors = [
-                'div[aria-label*="Send"][role="button"]',
-                'div[data-tooltip*="Send"][role="button"]',
-                'div.T-I.J-J5-Ji.aoO.v7.T-I-atl.L3',
-            ]
-            for sel in send_selectors:
+
+            if schedule_time:
+                # ─── Native Gmail Schedule Send ───
+                logger.info(f"[Gmail] Setting native Gmail Schedule Send: {schedule_time}")
                 try:
-                    send_btn = await page.wait_for_selector(sel, timeout=3000)
-                    if send_btn:
-                        await send_btn.click()
-                        send_clicked = True
-                        break
-                except Exception:
-                    continue
+                    # Click dropdown arrow next to Send button
+                    more_send_btn = await page.query_selector(
+                        'div[aria-label="More send options"], '
+                        'div[data-tooltip="More send options"], '
+                        'div[aria-haspopup="true"][data-tooltip*="send"], '
+                        'div.T-I.J-J5-Ji.aoO.v7.T-I-atl'
+                    )
+                    if more_send_btn:
+                        await more_send_btn.click()
+                        await asyncio.sleep(1.0)
+
+                        # Click "Schedule send" menu option
+                        schedule_menu_opt = await page.wait_for_selector(
+                            'div[role="menuitem"]:has-text("Schedule send"), '
+                            'div.J-N:has-text("Schedule send"), '
+                            'span:has-text("Schedule send")',
+                            timeout=4000
+                        )
+                        if schedule_menu_opt:
+                            await schedule_menu_opt.click()
+                            await asyncio.sleep(1.5)
+
+                            # Pick preset option or first available schedule slot (e.g. "Tomorrow morning")
+                            slot_opt = await page.query_selector(
+                                'div[role="menuitem"]:has-text("Tomorrow"), '
+                                'div[role="menuitem"]:has-text("morning"), '
+                                'div[role="menuitem"]:has-text("afternoon"), '
+                                'div.J-N:has-text("Tomorrow")'
+                            )
+                            if slot_opt:
+                                await slot_opt.click()
+                                send_clicked = True
+                                logger.info("[Gmail] ✅ Native Gmail Schedule Send configured via preset slot.")
+                                await asyncio.sleep(2.0)
+                            else:
+                                # Try clicking confirm button in schedule dialog
+                                confirm_btn = await page.query_selector('button:has-text("Schedule send"), div[role="button"]:has-text("Schedule send")')
+                                if confirm_btn:
+                                    await confirm_btn.click()
+                                    send_clicked = True
+                                    logger.info("[Gmail] ✅ Native Gmail Schedule Send confirmed.")
+                                    await asyncio.sleep(2.0)
+                except Exception as sched_err:
+                    logger.warning(f"[Gmail] Native schedule send failed: {sched_err}. Falling back to normal send.")
+
+            # Fallback / Normal Send
+            if not send_clicked:
+                send_selectors = [
+                    'div[aria-label*="Send"][role="button"]',
+                    'div[data-tooltip*="Send"][role="button"]',
+                    'div.T-I.J-J5-Ji.aoO.v7.T-I-atl.L3',
+                ]
+                for sel in send_selectors:
+                    try:
+                        send_btn = await page.wait_for_selector(sel, timeout=3000)
+                        if send_btn:
+                            await send_btn.click()
+                            send_clicked = True
+                            break
+                    except Exception:
+                        continue
 
             if not send_clicked:
                 try:
@@ -351,11 +404,12 @@ class GmailTool:
 
             await asyncio.sleep(2.5)
 
+            status_msg = "scheduled in Gmail" if schedule_time else "sent successfully"
             return {
                 "status": "SENT" if send_clicked else "ERROR",
                 "action_id": action_id,
                 "sent_on_chrome": send_clicked,
-                "message": f"Email to {recipient} sent successfully." if send_clicked else "Could not click Send"
+                "message": f"Email to {recipient} {status_msg}." if send_clicked else "Could not click Send"
             }
 
         except Exception as e:

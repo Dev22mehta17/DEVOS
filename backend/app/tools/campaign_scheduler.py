@@ -198,9 +198,8 @@ class CampaignScheduler:
             f"Execution: {schedule_display}"
         )
 
-        # If sending immediately, trigger processing instantly without waiting for loop
-        if not schedule_time:
-            asyncio.create_task(self._process_due_jobs())
+        # Trigger processing instantly to configure live in Gmail (immediate or Gmail Native Schedule Send)
+        asyncio.create_task(self._process_due_jobs())
 
         return campaign_id
 
@@ -333,14 +332,15 @@ class CampaignScheduler:
             )
             permission_engine.approve_action(action_id)
 
-            # Send via Gmail tool
+            # Send via Gmail tool (passes schedule_time for native Gmail schedule send)
             result = await gmail_tool.send_draft(
                 action_id=action_id,
                 payload={
                     "recipient": job.email,
                     "subject": job.subject,
                     "body": job.body,
-                    "attached_file": job.attached_file
+                    "attached_file": job.attached_file,
+                    "schedule_time": job.scheduled_at
                 }
             )
 
