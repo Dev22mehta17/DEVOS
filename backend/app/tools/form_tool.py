@@ -342,22 +342,17 @@ class FormTool:
                 label = f.get("field_label", "")
                 await browser_tool.select_dropdown_option(q_idx, str(val), label)
 
-        # Step 2: Upload resume ONLY if not already attached on page
+        # Step 2: Upload resume
         selected_res = approval_payload.get("selected_resume") if approval_payload else None
         if selected_res:
-            # Check if file is already attached on page (e.g. badge visible)
-            has_attached_file = await page.evaluate("""() => {
-                const attachedBadge = document.querySelector('.s09pje, div[data-item-id], div[aria-label*="Remove file"], span:has-text(".pdf")');
-                return !!attachedBadge;
-            }""")
-
-            if not has_attached_file:
-                resolved_path = FormTool._resolve_resume_path(selected_res)
-                if resolved_path and os.path.exists(resolved_path):
-                    logger.info(f"[FormTool] Uploading resume: {resolved_path}")
-                    await browser_tool.upload_file_to_google_form(resolved_path)
+            resolved_path = FormTool._resolve_resume_path(selected_res)
+            if resolved_path and os.path.exists(resolved_path):
+                logger.info(f"[FormTool] Uploading resume: {resolved_path}")
+                uploaded = await browser_tool.upload_file_to_google_form(resolved_path)
+                logger.info(f"[FormTool] Resume upload status: {uploaded}")
+                await asyncio.sleep(2.0)
             else:
-                logger.info("[FormTool] Resume already attached on form. Skipping re-upload.")
+                logger.warning(f"[FormTool] Could not resolve resume path: {selected_res}")
 
         # Step 3: Instant Submit click
         submitted = await browser_tool.click_submit_button()

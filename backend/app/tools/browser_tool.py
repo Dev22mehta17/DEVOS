@@ -798,25 +798,49 @@ class BrowserTool:
                         file_chooser = await fc_info.value
                         await file_chooser.set_files(file_path)
                         logger.info(f"[Upload] ✅ File selected via Browse chooser: {os.path.basename(file_path)}")
-                        await asyncio.sleep(4.0)
+                        await asyncio.sleep(3.0)
 
-                        # Click Upload confirm if present
-                        upload_btn = await picker_frame.query_selector('button:has-text("Upload"), div[role="button"]:has-text("Upload"), div[aria-label*="Upload"]')
-                        if upload_btn:
-                            await upload_btn.click()
-                            await asyncio.sleep(3.0)
+                        # Wait for upload to complete and click confirmation button
+                        upload_selectors = [
+                            'button:has-text("Upload")',
+                            'div[role="button"]:has-text("Upload")',
+                            'div[aria-label*="Upload"]',
+                            'button:has-text("Insert")',
+                            'div[role="button"]:has-text("Insert")',
+                            'button:has-text("Select")',
+                            '.picker-action-button',
+                            '#picker\\:ap\\:2'
+                        ]
+                        for sel in upload_selectors:
+                            try:
+                                btn = await picker_frame.query_selector(sel)
+                                if btn:
+                                    await btn.click()
+                                    logger.info(f"[Upload] Clicked confirmation button: {sel}")
+                                    await asyncio.sleep(3.0)
+                                    break
+                            except Exception:
+                                pass
+
+                        await asyncio.sleep(2.0)
                         return True
                     except Exception as e:
                         logger.warning(f"[Upload] Browse click chooser error: {e}")
 
-            # Fallback Method 3: Page-level file chooser
+            # Fallback Method 3: Page-level file chooser directly on Add File button
             try:
-                async with self.page.expect_file_chooser(timeout=4000) as fc_info:
+                async with self.page.expect_file_chooser(timeout=5000) as fc_info:
                     await add_btn.click()
                 file_chooser = await fc_info.value
                 await file_chooser.set_files(file_path)
                 logger.info("[Upload] ✅ Uploaded via page file chooser")
-                await asyncio.sleep(3.0)
+                await asyncio.sleep(4.0)
+
+                # Click confirmation button if visible on page
+                upload_submit = await self.page.query_selector('button:has-text("Upload"), div[role="button"]:has-text("Upload"), span:has-text("Upload")')
+                if upload_submit:
+                    await upload_submit.click()
+                    await asyncio.sleep(3.0)
                 return True
             except Exception:
                 pass
