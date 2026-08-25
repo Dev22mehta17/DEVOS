@@ -216,8 +216,8 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Grid Layout */}
-      <div className="app-main-grid">
+      {/* Main Grid */}
+      <div className="dashboard-grid">
         {/* Left Column: Command & Live Execution Feed */}
         <div className="main-column">
           {/* Goal Entry Card */}
@@ -235,16 +235,16 @@ export default function App() {
                 disabled={isProcessing}
               />
               <button
-                className="prompt-btn"
+                className="action-btn"
                 onClick={() => handleExecute()}
                 disabled={isProcessing || !goal.trim()}
               >
-                <Send size={16} />
+                <Sparkles size={18} /> Execute Goal
               </button>
             </div>
 
             {/* Quick Action Preset Chips */}
-            <div className="preset-chips-container">
+            <div className="chips-row">
               <button
                 className="chip-btn"
                 onClick={() => {
