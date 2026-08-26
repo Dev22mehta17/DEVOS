@@ -110,7 +110,7 @@ export default function MemoryManager({ profile, onSave }) {
         {/* Education & Experience */}
         <div>
           <div style={{ color: 'var(--accent-purple)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.3rem' }}>
-            <GraduationCap size={15} /> Education & Experience
+            <GraduationCap size={15} /> Education & Academic Scores
           </div>
           <input
             className="prompt-input"
@@ -126,6 +126,37 @@ export default function MemoryManager({ profile, onSave }) {
             onChange={(e) => handleChange('education', 'degree', e.target.value)}
             placeholder="Degree (e.g. B.E. Computer Engineering)"
           />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.35rem', marginBottom: '0.35rem' }}>
+            <input
+              className="prompt-input"
+              value={memoryData.education?.gpa || memoryData.education?.cgpa || ''}
+              onChange={(e) => {
+                handleChange('education', 'gpa', e.target.value);
+                handleChange('education', 'cgpa', e.target.value);
+              }}
+              placeholder="Graduation CGPA (8.7)"
+            />
+            <input
+              className="prompt-input"
+              value={memoryData.education?.graduation_year || ''}
+              onChange={(e) => handleChange('education', 'graduation_year', e.target.value)}
+              placeholder="Passing Year (2026)"
+            />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.35rem', marginBottom: '0.35rem' }}>
+            <input
+              className="prompt-input"
+              value={memoryData.education?.tenth_percentage || ''}
+              onChange={(e) => handleChange('education', 'tenth_percentage', e.target.value)}
+              placeholder="10th % (93.8)"
+            />
+            <input
+              className="prompt-input"
+              value={memoryData.education?.twelfth_percentage || ''}
+              onChange={(e) => handleChange('education', 'twelfth_percentage', e.target.value)}
+              placeholder="12th % (93.6)"
+            />
+          </div>
           <input
             className="prompt-input"
             style={{ width: '100%' }}
@@ -172,10 +203,17 @@ export default function MemoryManager({ profile, onSave }) {
           />
           <input
             className="prompt-input"
-            style={{ width: '100%' }}
+            style={{ width: '100%', marginBottom: '0.35rem' }}
             value={memoryData.links?.linkedin || ''}
             onChange={(e) => handleChange('links', 'linkedin', e.target.value)}
-            placeholder="LinkedIn URL (e.g. https://linkedin.com/in/DevMehta)"
+            placeholder="LinkedIn URL"
+          />
+          <input
+            className="prompt-input"
+            style={{ width: '100%' }}
+            value={memoryData.links?.portfolio || ''}
+            onChange={(e) => handleChange('links', 'portfolio', e.target.value)}
+            placeholder="Portfolio / Website URL (e.g. https://devmehta.dev)"
           />
         </div>
 
