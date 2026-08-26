@@ -270,7 +270,9 @@ class GmailTool:
                     if to_field:
                         await to_field.click()
                         await to_field.fill("")
-                        await page.keyboard.type(recipient, delay=25)
+                        # Use fill() instead of keyboard.type() — keyboard.type() sends chars
+                        # one at a time and Gmail autocomplete garbles the email address
+                        await to_field.fill(recipient)
                         await asyncio.sleep(0.5)
                         await page.keyboard.press("Tab")
                         to_filled = True

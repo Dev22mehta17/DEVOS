@@ -222,15 +222,16 @@ export default function CampaignPreviewModal({ campaignData, onApprove, onReject
                       </div>
                       <textarea
                         className="prompt-input"
-                        rows={7}
+                        rows={16}
                         value={d.body}
                         onChange={(e) => handleDraftChange(idx, 'body', e.target.value)}
                         style={{
-                          fontSize: '0.82rem',
-                          padding: '0.6rem',
+                          fontSize: '0.84rem',
+                          padding: '0.8rem',
                           fontFamily: 'var(--font-body)',
-                          lineHeight: 1.5,
-                          resize: 'vertical'
+                          lineHeight: 1.6,
+                          resize: 'vertical',
+                          minHeight: '320px'
                         }}
                       />
                     </div>
@@ -245,7 +246,7 @@ export default function CampaignPreviewModal({ campaignData, onApprove, onReject
         <div style={{ flexShrink: 0, marginTop: '0.8rem', paddingTop: '0.8rem', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <Sparkles size={14} color="var(--accent-cyan)" />
-            <span>Emails will be sent with 15s safety intervals & automatic retry on failure.</span>
+            <span>Emails will be sent with 14s safety intervals & automatic retry on failure.</span>
           </div>
 
           <div style={{ display: 'flex', gap: '0.6rem' }}>

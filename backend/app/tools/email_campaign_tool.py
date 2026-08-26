@@ -280,8 +280,8 @@ class EmailCampaignTool:
             else:
                 return now + timedelta(minutes=amount)
 
-        # Pattern: "tomorrow at HH:MM AM/PM" or "tomorrow at H AM/PM"
-        m = re.search(r'tomorrow\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?', text_lower)
+        # Pattern: "tomorrow at HH:MM AM/PM" or "tomorrow at H AM/PM" or "tomorrow at 4.21 PM"
+        m = re.search(r'tomorrow\s+(?:at\s+)?(\d{1,2})(?:[:\.](\d{2}))?\s*(am|pm)?', text_lower)
         if m:
             hour = int(m.group(1))
             minute = int(m.group(2) or 0)
@@ -293,8 +293,8 @@ class EmailCampaignTool:
             tomorrow = now + timedelta(days=1)
             return tomorrow.replace(hour=hour, minute=minute, second=0, microsecond=0)
 
-        # Pattern: "today at HH AM/PM" or "tonight at H"
-        m = re.search(r'(?:today|tonight)\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?', text_lower)
+        # Pattern: "today at HH AM/PM" or "tonight at H" or "today at 4.21 PM"
+        m = re.search(r'(?:today|tonight)\s+(?:at\s+)?(\d{1,2})(?:[:\.](\d{2}))?\s*(am|pm)?', text_lower)
         if m:
             hour = int(m.group(1))
             minute = int(m.group(2) or 0)
@@ -349,6 +349,22 @@ class EmailCampaignTool:
                 hour = 0
             year = now.year if month >= now.month else now.year + 1
             return datetime(year, month, day, hour, minute, 0)
+
+        # Pattern: bare time "at 4.21 PM" or "4:30 pm" or "4.21PM" (no today/tomorrow prefix)
+        m = re.search(r'(?:at\s+)?(\d{1,2})[:\.](\d{2})\s*(am|pm)', text_lower)
+        if m:
+            hour = int(m.group(1))
+            minute = int(m.group(2))
+            ampm = m.group(3)
+            if ampm == 'pm' and hour < 12:
+                hour += 12
+            elif ampm == 'am' and hour == 12:
+                hour = 0
+            target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+            # If time is already past, schedule for tomorrow
+            if target <= now:
+                target += timedelta(days=1)
+            return target
 
         return None
 

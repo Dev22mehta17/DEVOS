@@ -300,8 +300,8 @@ class CampaignScheduler:
                     campaign.get_status_summary()
                 )
 
-                # Rate limit: 4 seconds between sends
-                await asyncio.sleep(4)
+                # Rate limit: 14 seconds between sends
+                await asyncio.sleep(14)
 
     async def _execute_job(self, job: CampaignJob, campaign: Campaign):
         """Execute a single email job via Gmail."""
