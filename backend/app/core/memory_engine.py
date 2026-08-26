@@ -129,6 +129,30 @@ Custom Notes: {extra.get('custom_user_notes', '')}
             linkedin_match = re.search(r'https?://[w\.]*linkedin\.com/in/[\w\-]+', text)
             github_match = re.search(r'https?://[w\.]*github\.com/[\w\-]+', text)
 
+            # Extract underlying PDF hyperlink annotations (e.g. shortened links that resolve to full URLs)
+            try:
+                import pypdf
+                resolved_pdf_path = filename if os.path.isabs(filename) else os.path.join(os.path.dirname(__file__), "..", "..", "uploads", filename)
+                if os.path.exists(resolved_pdf_path) and resolved_pdf_path.lower().endswith(".pdf"):
+                    reader = pypdf.PdfReader(resolved_pdf_path)
+                    for page in reader.pages:
+                        if "/Annots" in page:
+                            for annot in page["/Annots"]:
+                                obj = annot.get_object()
+                                if "/A" in obj and "/URI" in obj["/A"]:
+                                    uri = str(obj["/A"]["/URI"]).strip()
+                                    if "linkedin.com/in/" in uri:
+                                        self.profile_data.setdefault("links", {})["linkedin"] = uri
+                                        logger.info(f"[Memory] Extracted underlying LinkedIn URI: {uri}")
+                                    elif "github.com/" in uri:
+                                        self.profile_data.setdefault("links", {})["github"] = uri
+                                        logger.info(f"[Memory] Extracted underlying GitHub URI: {uri}")
+                                    elif any(p in uri for p in ["vercel.app", "portfolio", "devmehta", ".dev"]):
+                                        self.profile_data.setdefault("links", {})["portfolio"] = uri
+                                        logger.info(f"[Memory] Extracted underlying Portfolio URI: {uri}")
+            except Exception as annot_err:
+                logger.debug(f"[Memory] Annotation extraction notice: {annot_err}")
+
             lines = [line.strip() for line in text.split('\n') if line.strip()]
             
             if "personal" not in self.profile_data: self.profile_data["personal"] = {}
@@ -140,9 +164,9 @@ Custom Notes: {extra.get('custom_user_notes', '')}
                 self.profile_data["personal"]["email_primary"] = email_match.group(0)
             if phone_match:
                 self.profile_data["personal"]["phone"] = phone_match.group(0).strip()
-            if linkedin_match:
+            if linkedin_match and "linkedin" not in self.profile_data.get("links", {}):
                 self.profile_data["links"]["linkedin"] = linkedin_match.group(0)
-            if github_match:
+            if github_match and "github" not in self.profile_data.get("links", {}):
                 self.profile_data["links"]["github"] = github_match.group(0)
 
             if lines and len(lines[0]) < 40 and not any(c in lines[0] for c in ['@', 'http', ':']):
