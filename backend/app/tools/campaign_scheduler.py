@@ -253,15 +253,6 @@ class CampaignScheduler:
             if campaign.status in ("COMPLETED", "CANCELLED"):
                 continue
 
-            # Check if campaign is due
-            if campaign.scheduled_at:
-                try:
-                    scheduled_dt = datetime.fromisoformat(campaign.scheduled_at)
-                    if scheduled_dt > now:
-                        continue  # Not yet time
-                except (ValueError, TypeError):
-                    pass
-
             # Find pending jobs
             pending_jobs = [j for j in campaign.jobs if j.status in ("PENDING", "RETRY")]
             if not pending_jobs:

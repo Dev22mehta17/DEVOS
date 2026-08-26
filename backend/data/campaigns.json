@@ -5,7 +5,7 @@
     "total_jobs": 3,
     "scheduled_at": "2026-08-27T10:00:00",
     "schedule_display": "Aug 27, 10:00 AM",
-    "status": "SCHEDULED",
+    "status": "RUNNING",
     "jobs": [
       {
         "job_id": "job_ad35aeb9",
@@ -19,11 +19,11 @@
         "body": "Hi Ananya,\n\nI hope you're doing well.\n\nI'm Dev Mehta, a Computer Engineering graduate from Thapar Institute of Engineering & Technology. I recently completed a 6-month Software Development Engineer internship at Amazon Pay India, where I worked on production systems and customer-facing features for a large-scale payment platform. I gained hands-on experience in software development, backend systems, debugging, and delivering reliable features in a production environment.\n\nI came across the AI Engineer opportunity at Atlys and would be very interested in being considered for the role.\n\nI have hands-on experience with Python, TensorFlow, and building ML pipelines, with a strong foundation in mathematics, statistics, and algorithm design. During my time at Amazon, I worked with data-driven systems and gained exposure to production-scale infrastructure that powers intelligent features.\n\nPlease find my updated resume attached for your consideration. I'd be grateful for the opportunity to discuss my profile further.\n\nThank you for your time and consideration.\n\nBest regards,\nDev Mehta\n\ud83d\udce7 mehtadev2004@gmail.com\n\ud83d\udcf1 +91-7206049507\n\ud83d\udd17 GitHub: https://github.com/Dev22mehta17\n\ud83d\udd17 LinkedIn: https://linkedin.com/in/DevMehta",
         "attached_file": "/Users/devmehta/Agent_mac/backend/uploads/DevMehta_CV.pdf",
         "scheduled_at": "2026-08-27T10:00:00",
-        "status": "PENDING",
-        "attempts": 0,
+        "status": "RETRY",
+        "attempts": 1,
         "max_retries": 2,
-        "sent_at": null,
-        "error_message": null,
+        "sent_at": "2026-08-26T12:28:37.816334",
+        "error_message": "Attempt 1/2: No browser context",
         "created_at": "2026-08-26T02:21:33.776468"
       },
       {
@@ -224,7 +224,7 @@
     "total_jobs": 2,
     "scheduled_at": "2026-08-27T10:00:00",
     "schedule_display": "Aug 27, 10:00 AM",
-    "status": "SCHEDULED",
+    "status": "CANCELLED",
     "jobs": [
       {
         "job_id": "job_90268212",
@@ -238,7 +238,7 @@
         "body": "Hi Mehtadev2004,\n\nI hope you're doing well.\n\nI'm Dev Mehta, a Computer Engineering graduate from Thapar Institute of Engineering & Technology. I recently completed a 6-month Software Development Engineer internship at Amazon Pay India, where I worked on production systems and customer-facing features for a large-scale payment platform. I gained hands-on experience in software development, backend systems, debugging, and delivering reliable features in a production environment.\n\nI came across the Software Development Engineer opportunity at Gmail and would be very interested in being considered for the role.\n\nI have strong proficiency in C++, Python, and data structures & algorithms, with experience building production-grade software systems. I bring a solid foundation in system design, problem-solving, and writing clean, maintainable code that ships reliably at scale.\n\nPlease find my updated resume attached for your consideration. I'd be grateful for the opportunity to discuss my profile further.\n\nThank you for your time and consideration.\n\nBest regards,\nDev Mehta\n\ud83d\udce7 mehtadev2004@gmail.com\n\ud83d\udcf1 +91-7206049507\n\ud83d\udd17 GitHub: https://github.com/Dev22mehta17\n\ud83d\udd17 LinkedIn: https://linkedin.com/in/DevMehta",
         "attached_file": "/Users/devmehta/Agent_mac/backend/uploads/DevMehta_CV.pdf",
         "scheduled_at": "2026-08-27T10:00:00",
-        "status": "PENDING",
+        "status": "CANCELLED",
         "attempts": 0,
         "max_retries": 2,
         "sent_at": null,
@@ -257,7 +257,7 @@
         "body": "Hi Dmehta Be22,\n\nI hope you're doing well.\n\nI'm Dev Mehta, a Computer Engineering graduate from Thapar Institute of Engineering & Technology. I recently completed a 6-month Software Development Engineer internship at Amazon Pay India, where I worked on production systems and customer-facing features for a large-scale payment platform. I gained hands-on experience in software development, backend systems, debugging, and delivering reliable features in a production environment.\n\nI came across the Software Development Engineer opportunity at Thapar and would be very interested in being considered for the role.\n\nI have strong proficiency in C++, Python, and data structures & algorithms, with experience building production-grade software systems. I bring a solid foundation in system design, problem-solving, and writing clean, maintainable code that ships reliably at scale.\n\nPlease find my updated resume attached for your consideration. I'd be grateful for the opportunity to discuss my profile further.\n\nThank you for your time and consideration.\n\nBest regards,\nDev Mehta\n\ud83d\udce7 mehtadev2004@gmail.com\n\ud83d\udcf1 +91-7206049507\n\ud83d\udd17 GitHub: https://github.com/Dev22mehta17\n\ud83d\udd17 LinkedIn: https://linkedin.com/in/DevMehta",
         "attached_file": "/Users/devmehta/Agent_mac/backend/uploads/DevMehta_CV.pdf",
         "scheduled_at": "2026-08-27T10:00:00",
-        "status": "PENDING",
+        "status": "CANCELLED",
         "attempts": 0,
         "max_retries": 2,
         "sent_at": null,
@@ -266,6 +266,56 @@
       }
     ],
     "created_at": "2026-08-26T02:58:51.175441",
+    "completed_at": null
+  },
+  "campaign_e18c7af5": {
+    "campaign_id": "campaign_e18c7af5",
+    "title": "Recruiter Outreach (2 emails)",
+    "total_jobs": 2,
+    "scheduled_at": "2026-08-27T10:00:00",
+    "schedule_display": "Aug 27, 10:00 AM",
+    "status": "SCHEDULED",
+    "jobs": [
+      {
+        "job_id": "job_f0b1d419",
+        "campaign_id": "campaign_e18c7af5",
+        "draft_index": 0,
+        "email": "mehtadev2004@gmail.com",
+        "name": "Mehtadev2004",
+        "company": "Gmail",
+        "role": "Software Development Engineer",
+        "subject": "Application for Software Development Engineer \u2013 Dev Mehta",
+        "body": "Hi Mehtadev2004,\n\nI hope you're doing well.\n\nI'm Dev Mehta, a Computer Engineering graduate from Thapar Institute of Engineering & Technology. I recently completed a 6-month Software Development Engineer internship at Amazon Pay India, where I worked on production systems and customer-facing features for a large-scale payment platform. I gained hands-on experience in software development, backend systems, debugging, and delivering reliable features in a production environment.\n\nI came across the Software Development Engineer opportunity at Gmail and would be very interested in being considered for the role.\n\nI have strong proficiency in C++, Python, and data structures & algorithms, with experience building production-grade software systems. I bring a solid foundation in system design, problem-solving, and writing clean, maintainable code that ships reliably at scale.\n\nPlease find my updated resume attached for your consideration. I'd be grateful for the opportunity to discuss my profile further.\n\nThank you for your time and consideration.\n\nBest regards,\nDev Mehta\n\ud83d\udce7 mehtadev2004@gmail.com\n\ud83d\udcf1 +91-7206049507\n\ud83d\udd17 GitHub: https://github.com/Dev22mehta17\n\ud83d\udd17 LinkedIn: https://linkedin.com/in/DevMehta",
+        "attached_file": "/Users/devmehta/Agent_mac/backend/uploads/DevMehta_CV.pdf",
+        "scheduled_at": "2026-08-27T10:00:00",
+        "status": "PENDING",
+        "attempts": 0,
+        "max_retries": 2,
+        "sent_at": null,
+        "error_message": null,
+        "created_at": "2026-08-26T03:03:22.424520"
+      },
+      {
+        "job_id": "job_f2aa4829",
+        "campaign_id": "campaign_e18c7af5",
+        "draft_index": 1,
+        "email": "dmehta_be22@thapar.edu",
+        "name": "Dmehta Be22",
+        "company": "Thapar",
+        "role": "Software Development Engineer",
+        "subject": "Application for Software Development Engineer \u2013 Dev Mehta",
+        "body": "Hi Dmehta Be22,\n\nI hope you're doing well.\n\nI'm Dev Mehta, a Computer Engineering graduate from Thapar Institute of Engineering & Technology. I recently completed a 6-month Software Development Engineer internship at Amazon Pay India, where I worked on production systems and customer-facing features for a large-scale payment platform. I gained hands-on experience in software development, backend systems, debugging, and delivering reliable features in a production environment.\n\nI came across the Software Development Engineer opportunity at Thapar and would be very interested in being considered for the role.\n\nI have strong proficiency in C++, Python, and data structures & algorithms, with experience building production-grade software systems. I bring a solid foundation in system design, problem-solving, and writing clean, maintainable code that ships reliably at scale.\n\nPlease find my updated resume attached for your consideration. I'd be grateful for the opportunity to discuss my profile further.\n\nThank you for your time and consideration.\n\nBest regards,\nDev Mehta\n\ud83d\udce7 mehtadev2004@gmail.com\n\ud83d\udcf1 +91-7206049507\n\ud83d\udd17 GitHub: https://github.com/Dev22mehta17\n\ud83d\udd17 LinkedIn: https://linkedin.com/in/DevMehta",
+        "attached_file": "/Users/devmehta/Agent_mac/backend/uploads/DevMehta_CV.pdf",
+        "scheduled_at": "2026-08-27T10:00:00",
+        "status": "PENDING",
+        "attempts": 0,
+        "max_retries": 2,
+        "sent_at": null,
+        "error_message": null,
+        "created_at": "2026-08-26T03:03:22.424563"
+      }
+    ],
+    "created_at": "2026-08-26T03:03:22.424607",
     "completed_at": null
   }
 }
