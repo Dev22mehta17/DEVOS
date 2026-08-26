@@ -392,32 +392,53 @@ class BrowserTool:
             success = await self.page.evaluate("""([idx, nameStr, valStr, labelStr, qIdx]) => {
                 const cleanStr = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
                 const targetLabel = cleanStr(labelStr);
-                const labelWords = targetLabel.split(' ').filter(w => w.length > 2);
+                const targetWords = targetLabel.split(' ').filter(w => w.length > 1);
 
                 let input = null;
 
-                // Strategy 1: Find target question block by label text
-                if (targetLabel) {
-                    const blocks = Array.from(document.querySelectorAll('div[role="listitem"], .geS5n, .freebirdFormviewerViewNumberedItemContainer, fieldset'));
+                const blocks = Array.from(document.querySelectorAll('div[role="listitem"], .geS5n, .freebirdFormviewerViewNumberedItemContainer, fieldset'));
+
+                // Strategy 1: If valid question index is provided, verify heading matches or use as primary
+                if (qIdx !== null && qIdx !== undefined && qIdx < blocks.length) {
+                    const block = blocks[qIdx];
+                    const heading = block.querySelector('div[role="heading"], .M7eMe, legend, label, span');
+                    const hText = heading ? cleanStr(heading.innerText) : '';
+                    
+                    // If target label is empty or matches this block's heading
+                    if (!targetLabel || hText === targetLabel || hText.includes(targetLabel) || targetLabel.includes(hText)) {
+                        input = block.querySelector('input[type="text"], input[type="email"], input[type="tel"], input[type="number"], input[type="url"], input[type="date"], textarea, input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"])');
+                    }
+                }
+
+                // Strategy 2: Find target question block by precise label text
+                if (!input && targetLabel) {
                     let bestBlock = null;
                     let bestScore = 0;
 
-                    blocks.forEach((b) => {
-                        const heading = b.querySelector('div[role="heading"], .M7eMe, legend, label, span');
+                    blocks.forEach((b, bIdx) => {
+                        const heading = b.querySelector('div[role="heading"], .M7eMe, legend, label');
                         if (!heading) return;
                         const hText = cleanStr(heading.innerText);
                         if (!hText) return;
+                        const hWords = hText.split(' ').filter(w => w.length > 1);
 
                         let score = 0;
-                        if (hText.includes(targetLabel) || targetLabel.includes(hText)) {
-                            score = 100;
+                        if (hText === targetLabel) {
+                            score = 1000;
                         } else {
-                            labelWords.forEach(w => {
-                                if (hText.includes(w)) score += 10;
+                            let common = 0;
+                            targetWords.forEach(w => {
+                                if (hWords.includes(w)) common++;
                             });
+                            const total = new Set([...targetWords, ...hWords]).size;
+                            const jaccard = total > 0 ? (common / total) : 0;
+                            score = jaccard * 100;
+
+                            // Small bonus if qIdx matches
+                            if (qIdx !== null && qIdx !== undefined && qIdx === bIdx) score += 15;
                         }
 
-                        if (score > bestScore && score >= 20) {
+                        if (score > bestScore && score >= 35) {
                             bestScore = score;
                             bestBlock = b;
                         }
@@ -425,14 +446,6 @@ class BrowserTool:
 
                     if (bestBlock) {
                         input = bestBlock.querySelector('input[type="text"], input[type="email"], input[type="tel"], input[type="number"], input[type="url"], input[type="date"], textarea, input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"])');
-                    }
-                }
-
-                // Strategy 2: Find by question index if provided
-                if (!input && qIdx !== null && qIdx !== undefined) {
-                    const blocks = Array.from(document.querySelectorAll('div[role="listitem"], .geS5n, .freebirdFormviewerViewNumberedItemContainer, fieldset'));
-                    if (qIdx < blocks.length) {
-                        input = blocks[qIdx].querySelector('input[type="text"], input[type="email"], input[type="tel"], input[type="number"], input[type="url"], textarea, input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"])');
                     }
                 }
 
@@ -450,6 +463,8 @@ class BrowserTool:
                 if (input) {
                     input.scrollIntoView({ behavior: 'auto', block: 'center' });
                     input.focus();
+                    input.value = '';
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
                     input.value = valStr;
                     input.dispatchEvent(new Event('input', { bubbles: true }));
                     input.dispatchEvent(new Event('change', { bubbles: true }));
@@ -472,40 +487,44 @@ class BrowserTool:
                 const optClean = (optText || '').toLowerCase().trim();
                 const cleanStr = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
                 const targetLabel = cleanStr(qLabel);
-                const labelWords = targetLabel.split(' ').filter(w => w.length > 2);
+                const targetWords = targetLabel.split(' ').filter(w => w.length > 1);
 
                 const blocks = Array.from(document.querySelectorAll('div[role="listitem"], fieldset, .freebirdFormviewerViewNumberedItemContainer, .geS5n'));
 
-                // Strategy 1: Find target question block by heading similarity
                 let targetBlock = null;
-                let bestScore = 0;
-
-                blocks.forEach((b, idx) => {
-                    const headingEl = b.querySelector('div[role="heading"], .M7eMe, legend, label, span');
-                    if (!headingEl) return;
-                    const hText = cleanStr(headingEl.innerText);
-                    if (!hText) return;
-
-                    let score = 0;
-                    if (hText.includes(targetLabel) || targetLabel.includes(hText)) {
-                        score = 100;
-                    } else {
-                        labelWords.forEach(w => {
-                            if (hText.includes(w)) score += 10;
-                        });
-                    }
-
-                    if (score > bestScore && score >= 20) {
-                        bestScore = score;
-                        targetBlock = b;
-                    }
-                });
-
-                if (!targetBlock && qIdx < blocks.length) {
+                if (qIdx !== null && qIdx !== undefined && qIdx < blocks.length) {
                     targetBlock = blocks[qIdx];
                 }
 
-                // Strategy 2: Search within targetBlock, then fallback to whole document
+                if (!targetBlock && targetLabel) {
+                    let bestScore = 0;
+                    blocks.forEach((b) => {
+                        const headingEl = b.querySelector('div[role="heading"], .M7eMe, legend, label');
+                        if (!headingEl) return;
+                        const hText = cleanStr(headingEl.innerText);
+                        if (!hText) return;
+                        const hWords = hText.split(' ').filter(w => w.length > 1);
+
+                        let score = 0;
+                        if (hText === targetLabel) {
+                            score = 1000;
+                        } else {
+                            let common = 0;
+                            targetWords.forEach(w => {
+                                if (hWords.includes(w)) common++;
+                            });
+                            const total = new Set([...targetWords, ...hWords]).size;
+                            score = total > 0 ? (common / total) * 100 : 0;
+                        }
+
+                        if (score > bestScore && score >= 35) {
+                            bestScore = score;
+                            targetBlock = b;
+                        }
+                    });
+                }
+
+                // Search within targetBlock, then fallback to whole document
                 const roots = targetBlock ? [targetBlock, document] : [document];
 
                 for (const searchRoot of roots) {

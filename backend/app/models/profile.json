@@ -12,7 +12,11 @@
     "university": "Thapar Institute of Engineering and Technology, Patiala",
     "degree": "B.E. Computer Engineering",
     "graduation_year": "2026",
-    "gpa": "8.7 / 10.0 (3.8/4.0)",
+    "gpa": "8.7",
+    "cgpa": "8.7",
+    "graduation_cgpa": "8.7",
+    "tenth_percentage": "93.8",
+    "twelfth_percentage": "93.6",
     "coursework": [
       "Data Structures",
       "Algorithms",

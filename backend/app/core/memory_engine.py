@@ -199,33 +199,48 @@ Custom Notes: {extra.get('custom_user_notes', '')}
         if any(k in field_lower for k in ["offer in hand", "any offer", "holding offer", "holding any offer", "other offer", "competing offer", "current offer"]):
             return "No offer in hand / Currently interviewing"
 
-        # 2. Education & College (Specific check before candidate name!)
-        if any(k in field_lower for k in ["college", "university", "school", "institution", "institute", "alma mater"]):
+        # 2. Education: 10th, 12th, and Graduation Percentage / CGPA
+        # 10th marks / percentage
+        if any(k in field_lower for k in ["10th", "10 th", "secondary", "matric", "class 10", "class x", "tenth"]):
+            return self.profile_data.get("education", {}).get("tenth_percentage", "93.8")
+        
+        # 12th marks / percentage
+        if any(k in field_lower for k in ["12th", "12 th", "higher secondary", "intermediate", "class 12", "class xii", "twelfth"]):
+            return self.profile_data.get("education", {}).get("twelfth_percentage", "93.6")
+
+        # Graduation / College CGPA & Percentage (MUST be checked before general graduation year)
+        if any(k in field_lower for k in ["cgpa", "gpa", "percentage", "marks", "score", "grade point"]):
+            return self.profile_data.get("education", {}).get("gpa", "8.7")
+
+        # Graduation Year / Pass out year
+        if any(k in field_lower for k in ["grad year", "graduation year", "passing year", "pass out", "passout", "batch", "graduating year", "year of pass", "year of graduation", "year you pass"]):
+            return self.profile_data.get("education", {}).get("graduation_year", "2026")
+        if "graduation" in field_lower and not any(k in field_lower for k in ["cgpa", "gpa", "percent", "mark"]):
+            return self.profile_data.get("education", {}).get("graduation_year", "2026")
+
+        # College / University / Institute Name (Specific check before candidate name!)
+        if any(k in field_lower for k in ["college", "university", "institution", "institute", "alma mater"]):
             return self.profile_data.get("education", {}).get("university")
-        if any(k in field_lower for k in ["degree", "major", "qualification", "branch", "stream"]):
+        if any(k in field_lower for k in ["degree", "major", "qualification", "branch", "stream", "course"]):
             return self.profile_data.get("education", {}).get("degree")
-        if any(k in field_lower for k in ["graduation", "grad year", "passing year", "pass out", "passout", "batch", "graduating year"]):
-            return self.profile_data.get("education", {}).get("graduation_year")
-        if "gpa" in field_lower or "cgpa" in field_lower:
-            return self.profile_data.get("education", {}).get("gpa")
 
         # 3. Company & Employer (Specific check before candidate name!)
-        if any(k in field_lower for k in ["company name", "current employer", "organization name", "current company", "firm name"]):
+        if any(k in field_lower for k in ["company name", "current employer", "organization name", "current company", "firm name", "employer"]):
             return self.profile_data.get("professional", {}).get("current_company")
 
         # 4. Personal Contact & Candidate Name
         if "email" in field_lower:
             return self.profile_data.get("personal", {}).get("email_primary")
-        if any(k in field_lower for k in ["phone", "mobile", "contact number", "whatsapp"]):
+        if any(k in field_lower for k in ["phone", "mobile", "contact", "whatsapp", "cell"]):
             return self.profile_data.get("personal", {}).get("phone")
         if any(k in field_lower for k in ["location", "address", "city", "state", "current location"]):
             return self.profile_data.get("personal", {}).get("location")
         if "gender" in field_lower:
             return self.profile_data.get("personal", {}).get("gender")
 
-        # Candidate Name (Only if NOT college name, company name, school name)
+        # Candidate Name (Only if NOT college name, company name, school name, project name)
         if any(k in field_lower for k in ["full name", "your name", "candidate name", "applicant name", "first name"]) or \
-           (field_lower.strip() in ["name", "name *"] or ("name" in field_lower and not any(x in field_lower for x in ["college", "univ", "school", "comp", "employ", "org", "proj", "role", "file", "skill"]))):
+           (field_lower.strip() in ["name", "name *"] or ("name" in field_lower and not any(x in field_lower for x in ["college", "univ", "school", "comp", "employ", "org", "proj", "role", "file", "skill", "institute", "father", "mother"]))):
             return self.profile_data.get("personal", {}).get("full_name")
 
         # 5. Links
