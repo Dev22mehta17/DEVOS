@@ -102,10 +102,7 @@ Thank you for your time and consideration.
 
 Best regards,
 Dev Mehta
-📧 mehtadev2004@gmail.com
-📱 +91-7206049507
-🔗 GitHub: https://github.com/Dev22mehta17
-🔗 LinkedIn: https://linkedin.com/in/DevMehta"""
+{{contact_block}}"""
 
 
 class EmailCampaignTool:
@@ -214,11 +211,34 @@ class EmailCampaignTool:
         # Get role-specific skill lines
         skill_match = EmailCampaignTool.match_skill_lines(role)
 
+        # Build contact block dynamically from profile.json
+        p = memory_engine.profile_data
+        contact_lines = []
+        user_email = p.get("personal", {}).get("email_primary", "mehtadev2004@gmail.com")
+        user_phone = p.get("personal", {}).get("phone", "")
+        github_url = p.get("links", {}).get("github", "")
+        linkedin_url = p.get("links", {}).get("linkedin", "")
+        portfolio_url = p.get("links", {}).get("portfolio", "")
+
+        if user_email:
+            contact_lines.append(f"Email: {user_email}")
+        if user_phone:
+            contact_lines.append(f"Phone: {user_phone}")
+        if github_url:
+            contact_lines.append(f"GitHub: {github_url}")
+        if linkedin_url:
+            contact_lines.append(f"LinkedIn: {linkedin_url}")
+        if portfolio_url:
+            contact_lines.append(f"Portfolio: {portfolio_url}")
+
+        contact_block = "\n".join(contact_lines)
+
         body = tmpl.replace("{{name}}", name)
         body = body.replace("{{company}}", company)
         body = body.replace("{{role}}", role)
         body = body.replace("{{skill_lines}}", skill_match["skill_lines"])
         body = body.replace("{{relevant_skills}}", skill_match["relevant_skills"])
+        body = body.replace("{{contact_block}}", contact_block)
 
         # Remove any leftover template vars
         body = re.sub(r'\{\{[^}]+\}\}', '', body)

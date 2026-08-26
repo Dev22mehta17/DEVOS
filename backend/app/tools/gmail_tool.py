@@ -227,7 +227,6 @@ class GmailTool:
             return {"status": "ERROR", "sent_on_chrome": False, "message": "No browser context"}
 
         page = None
-        page = None
         try:
             page = await browser_tool.get_active_page()
             await page.goto("https://mail.google.com/mail/u/0/#inbox", wait_until="domcontentloaded", timeout=30000)
@@ -297,13 +296,27 @@ class GmailTool:
 
             await asyncio.sleep(0.5)
 
-            # Step 4: Fill Body
+            # Step 4: Fill Body — use innerHTML injection instead of keyboard.type()
+            # keyboard.type() sends one character at a time which triggers Gmail Smart Compose
+            # auto-suggestions, causing catastrophic text garbling.
             for sel in ['div[aria-label="Message Body"]', 'div[role="textbox"]', 'div[contenteditable="true"]']:
                 try:
                     body_el = await page.wait_for_selector(sel, timeout=3000)
                     if body_el:
                         await body_el.click()
-                        await page.keyboard.type(body, delay=10)
+                        # Convert plain text body to HTML paragraphs for Gmail's contenteditable div
+                        escaped_body = body.replace("\\", "\\\\").replace("`", "\\`").replace("${", "\\${")
+                        html_body = "<br>".join(
+                            line if line.strip() else "<br>"
+                            for line in escaped_body.split("\n")
+                        )
+                        await page.evaluate(f"""(sel) => {{
+                            const el = document.querySelector(sel);
+                            if (el) {{
+                                el.innerHTML = `{html_body}`;
+                                el.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                            }}
+                        }}""", sel)
                         break
                 except Exception:
                     continue

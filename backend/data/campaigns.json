@@ -317,5 +317,55 @@
     ],
     "created_at": "2026-08-26T03:03:22.424607",
     "completed_at": "2026-08-26T12:47:50.454108"
+  },
+  "campaign_f24c32fc": {
+    "campaign_id": "campaign_f24c32fc",
+    "title": "Recruiter Outreach (2 emails)",
+    "total_jobs": 2,
+    "scheduled_at": "",
+    "schedule_display": "Immediately",
+    "status": "CANCELLED",
+    "jobs": [
+      {
+        "job_id": "job_6135e862",
+        "campaign_id": "campaign_f24c32fc",
+        "draft_index": 0,
+        "email": "mehtadev2004@gmail.com",
+        "name": "Mehtadev2004",
+        "company": "Gmail",
+        "role": "Software Development Engineer",
+        "subject": "Application for Software Development Engineer \u2013 Dev Mehta",
+        "body": "Hi Mehtadev2004,\n\nI hope you're doing well.\n\nI'm Dev Mehta, a Computer Engineering graduate from Thapar Institute of Engineering & Technology. I recently completed a 6-month Software Development Engineer internship at Amazon Pay India, where I worked on production systems and customer-facing features for a large-scale payment platform. I gained hands-on experience in software development, backend systems, debugging, and delivering reliable features in a production environment.\n\nI came across the Software Development Engineer opportunity at Gmail and would be very interested in being considered for the role.\n\nI have strong proficiency in C++, Python, and data structures & algorithms, with experience building production-grade software systems. I bring a solid foundation in system design, problem-solving, and writing clean, maintainable code that ships reliably at scale.\n\nPlease find my updated resume attached for your consideration. I'd be grateful for the opportunity to discuss my profile further.\n\nThank you for your time and consideration.\n\nBest regards,\nDev Mehta\n\ud83d\udce7 mehtadev2004@gmail.com\n\ud83d\udcf1 +91-7206049507\n\ud83d\udd17 GitHub: https://github.com/Dev22mehta17\n\ud83d\udd17 LinkedIn: https://linkedin.com/in/DevMehta",
+        "attached_file": "/Users/devmehta/Agent_mac/backend/uploads/DevMehta_CV.pdf",
+        "scheduled_at": "",
+        "status": "SENT",
+        "attempts": 1,
+        "max_retries": 2,
+        "sent_at": "2026-08-26T16:09:51.246803",
+        "error_message": null,
+        "created_at": "2026-08-26T16:09:05.261730"
+      },
+      {
+        "job_id": "job_bcb04abd",
+        "campaign_id": "campaign_f24c32fc",
+        "draft_index": 1,
+        "email": "dmehta_be22@thapar.edu",
+        "name": "Dmehta Be22",
+        "company": "Thapar",
+        "role": "Software Development Engineer",
+        "subject": "Application for Software Development Engineer \u2013 Dev Mehta",
+        "body": "Hi Dmehta Be22,\n\nI hope you're doing well.\n\nI'm Dev Mehta, a Computer Engineering graduate from Thapar Institute of Engineering & Technology. I recently completed a 6-month Software Development Engineer internship at Amazon Pay India, where I worked on production systems and customer-facing features for a large-scale payment platform. I gained hands-on experience in software development, backend systems, debugging, and delivering reliable features in a production environment.\n\nI came across the Software Development Engineer opportunity at Thapar and would be very interested in being considered for the role.\n\nI have strong proficiency in C++, Python, and data structures & algorithms, with experience building production-grade software systems. I bring a solid foundation in system design, problem-solving, and writing clean, maintainable code that ships reliably at scale.\n\nPlease find my updated resume attached for your consideration. I'd be grateful for the opportunity to discuss my profile further.\n\nThank you for your time and consideration.\n\nBest regards,\nDev Mehta\n\ud83d\udce7 mehtadev2004@gmail.com\n\ud83d\udcf1 +91-7206049507\n\ud83d\udd17 GitHub: https://github.com/Dev22mehta17\n\ud83d\udd17 LinkedIn: https://linkedin.com/in/DevMehta",
+        "attached_file": "/Users/devmehta/Agent_mac/backend/uploads/DevMehta_CV.pdf",
+        "scheduled_at": "",
+        "status": "SENT",
+        "attempts": 2,
+        "max_retries": 2,
+        "sent_at": "2026-08-26T16:12:37.322690",
+        "error_message": null,
+        "created_at": "2026-08-26T16:09:05.261802"
+      }
+    ],
+    "created_at": "2026-08-26T16:09:05.261851",
+    "completed_at": null
   }
 }
