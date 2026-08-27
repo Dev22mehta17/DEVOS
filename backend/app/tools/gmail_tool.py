@@ -298,29 +298,24 @@ class GmailTool:
 
             await asyncio.sleep(0.5)
 
-            # Step 4: Fill Body — use innerHTML injection instead of keyboard.type()
-            # keyboard.type() sends one character at a time which triggers Gmail Smart Compose
-            # auto-suggestions, causing catastrophic text garbling.
+            # Step 4: Fill Body — use atomic insert_text()
+            # keyboard.insert_text() sends an atomic text input command without character-by-character
+            # delays. This prevents Gmail autocomplete interference, preserves newlines and formatting,
+            # and properly updates Gmail's internal closure draft state.
+            body_filled = False
             for sel in ['div[aria-label="Message Body"]', 'div[role="textbox"]', 'div[contenteditable="true"]']:
                 try:
                     body_el = await page.wait_for_selector(sel, timeout=3000)
                     if body_el:
                         await body_el.click()
-                        # Convert plain text body to HTML paragraphs for Gmail's contenteditable div
-                        escaped_body = body.replace("\\", "\\\\").replace("`", "\\`").replace("${", "\\${")
-                        html_body = "<br>".join(
-                            line if line.strip() else "<br>"
-                            for line in escaped_body.split("\n")
-                        )
-                        await page.evaluate(f"""(sel) => {{
-                            const el = document.querySelector(sel);
-                            if (el) {{
-                                el.innerHTML = `{html_body}`;
-                                el.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                            }}
-                        }}""", sel)
+                        await asyncio.sleep(0.3)
+                        await page.keyboard.insert_text(body)
+                        await asyncio.sleep(0.5)
+                        body_filled = True
+                        logger.info("[Gmail] ✅ Email body inserted successfully via insert_text")
                         break
-                except Exception:
+                except Exception as b_err:
+                    logger.debug(f"[Gmail] Body selector {sel} error: {b_err}")
                     continue
 
             await asyncio.sleep(1.0)

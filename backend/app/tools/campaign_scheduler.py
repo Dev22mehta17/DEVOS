@@ -247,61 +247,88 @@ class CampaignScheduler:
 
     async def _process_due_jobs(self):
         """Find and execute all due jobs across all campaigns."""
-        now = datetime.now()
+        if not hasattr(self, '_lock') or self._lock is None:
+            self._lock = asyncio.Lock()
 
-        for campaign_id, campaign in list(self.campaigns.items()):
-            if campaign.status in ("COMPLETED", "CANCELLED"):
-                continue
+        # If another execution loop is already in-flight, skip to avoid duplicate processing
+        if self._lock.locked():
+            return
 
-            # Find pending jobs
-            pending_jobs = [j for j in campaign.jobs if j.status in ("PENDING", "RETRY")]
-            if not pending_jobs:
-                # Check if campaign is complete
-                all_done = all(j.status in ("SENT", "FAILED", "CANCELLED") for j in campaign.jobs)
-                if all_done and campaign.status != "COMPLETED":
-                    campaign.status = "COMPLETED"
-                    campaign.completed_at = datetime.now().isoformat()
-                    self._persist()
+        async with self._lock:
+            now = datetime.now()
+
+            for campaign_id, campaign in list(self.campaigns.items()):
+                if campaign.status in ("COMPLETED", "CANCELLED"):
+                    continue
+
+                # Find due pending jobs (strictly verify scheduled_at timestamp has arrived)
+                due_jobs = []
+                for j in campaign.jobs:
+                    if j.status in ("PENDING", "RETRY"):
+                        if j.scheduled_at:
+                            try:
+                                sched_str = str(j.scheduled_at).replace("Z", "")
+                                sched_dt = datetime.fromisoformat(sched_str)
+                                if sched_dt.tzinfo is not None:
+                                    sched_dt = sched_dt.replace(tzinfo=None)
+                                if now < sched_dt:
+                                    # Not due yet! Keep pending until scheduled time arrives
+                                    continue
+                            except Exception as parse_err:
+                                logger.warning(f"[Scheduler] Date parsing error for job {j.job_id}: {parse_err}")
+                        due_jobs.append(j)
+
+                if not due_jobs:
+                    # Check if all jobs in campaign are done
+                    all_done = all(j.status in ("SENT", "FAILED", "CANCELLED") for j in campaign.jobs)
+                    if all_done and campaign.status != "COMPLETED":
+                        campaign.status = "COMPLETED"
+                        campaign.completed_at = datetime.now().isoformat()
+                        self._persist()
+                        await self._emit(
+                            "CAMPAIGN_PROGRESS",
+                            f"✅ Campaign complete! {sum(1 for j in campaign.jobs if j.status == 'SENT')}/{campaign.total_jobs} emails sent.",
+                            campaign.get_status_summary()
+                        )
+                    continue
+
+                # Mark campaign as running
+                if campaign.status == "SCHEDULED":
+                    campaign.status = "RUNNING"
                     await self._emit(
                         "CAMPAIGN_PROGRESS",
-                        f"✅ Campaign complete! {sum(1 for j in campaign.jobs if j.status == 'SENT')}/{campaign.total_jobs} emails sent.",
+                        f"📧 Scheduled time reached! Sending {len(due_jobs)} emails...",
                         campaign.get_status_summary()
                     )
-                continue
 
-            # Mark campaign as running
-            if campaign.status == "SCHEDULED":
-                campaign.status = "RUNNING"
-                await self._emit(
-                    "CAMPAIGN_PROGRESS",
-                    f"📧 Campaign started! Sending {len(pending_jobs)} emails...",
-                    campaign.get_status_summary()
-                )
+                # Execute due jobs with 14s rate limit
+                for job in due_jobs:
+                    # Double check status to prevent duplicate execution
+                    if job.status not in ("PENDING", "RETRY"):
+                        continue
 
-            # Execute pending jobs with fast interval (4s)
-            for job in pending_jobs:
-                # Check retry backoff
-                if job.status == "RETRY" and job.attempts > 0:
-                    if job.sent_at:
-                        try:
-                            last_attempt = datetime.fromisoformat(job.sent_at)
-                            if (now - last_attempt).total_seconds() < 30:
-                                continue
-                        except (ValueError, TypeError):
-                            pass
+                    # Check retry backoff
+                    if job.status == "RETRY" and job.attempts > 0:
+                        if job.sent_at:
+                            try:
+                                last_attempt = datetime.fromisoformat(job.sent_at)
+                                if (now - last_attempt).total_seconds() < 30:
+                                    continue
+                            except (ValueError, TypeError):
+                                pass
 
-                await self._execute_job(job, campaign)
-                self._persist()
+                    await self._execute_job(job, campaign)
+                    self._persist()
 
-                # Emit progress update
-                await self._emit(
-                    "CAMPAIGN_PROGRESS",
-                    f"Campaign update: {job.name} @ {job.company} — {job.status}",
-                    campaign.get_status_summary()
-                )
+                    # Emit progress update
+                    await self._emit(
+                        "CAMPAIGN_PROGRESS",
+                        f"Campaign update: {job.name} @ {job.company} — {job.status}",
+                        campaign.get_status_summary()
+                    )
 
-                # Rate limit: 14 seconds between sends
-                await asyncio.sleep(14)
+                    # Rate limit: 14 seconds between sends
+                    await asyncio.sleep(14)
 
     async def _execute_job(self, job: CampaignJob, campaign: Campaign):
         """Execute a single email job via Gmail."""
@@ -310,6 +337,7 @@ class CampaignScheduler:
 
         job.status = "SENDING"
         job.attempts += 1
+        self._persist()
 
         try:
             logger.info(f"[Scheduler] Sending email to {job.email} ({job.name} @ {job.company})...")
@@ -323,15 +351,14 @@ class CampaignScheduler:
             )
             permission_engine.approve_action(action_id)
 
-            # Send via Gmail tool (passes schedule_time for native Gmail schedule send)
+            # Send via Gmail tool (Scheduler itself triggered at the due time)
             result = await gmail_tool.send_draft(
                 action_id=action_id,
                 payload={
                     "recipient": job.email,
                     "subject": job.subject,
                     "body": job.body,
-                    "attached_file": job.attached_file,
-                    "schedule_time": job.scheduled_at
+                    "attached_file": job.attached_file
                 }
             )
 
