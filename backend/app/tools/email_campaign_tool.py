@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 # ──────────────────────────────────────────────────
-# ROLE-SPECIFIC SKILL LINES (deterministic, no LLM)
+# ROLE-SPECIFIC SKILL LINES (tailored to role)
 # ──────────────────────────────────────────────────
 SKILL_PROFILES = {
     "ml_ai": {
@@ -19,86 +19,76 @@ SKILL_PROFILES = {
                      "deep learning", "nlp", "computer vision", "llm", "neural", "tensorflow",
                      "pytorch", "model", "genai", "gen ai"],
         "skill_lines": (
-            "I have hands-on experience with Python, TensorFlow, and building ML pipelines, "
-            "with a strong foundation in mathematics, statistics, and algorithm design. "
-            "During my time at Amazon, I worked with data-driven systems and gained exposure "
-            "to production-scale infrastructure that powers intelligent features."
+            "I have hands-on experience with Python, TensorFlow, PyTorch, and building ML pipelines, "
+            "with a solid foundation in DSA, mathematics, statistics, and algorithm design."
         ),
-        "relevant_skills": "Python, TensorFlow, Machine Learning, Data Pipelines"
+        "relevant_skills": "Python, TensorFlow, PyTorch, Machine Learning, Data Pipelines"
     },
     "backend": {
         "keywords": ["backend", "back-end", "server", "api", "microservices", "distributed",
                      "java", "spring", "django", "flask", "fastapi", "node", "golang", "go",
-                     "rest", "grpc", "kafka", "redis", "database"],
+                     "rest", "grpc", "kafka", "redis", "database", "sde-1", "sde 1"],
         "skill_lines": (
-            "I have strong proficiency in Java, Python, and building scalable backend microservices, "
-            "with hands-on experience in REST API design, database optimization, and distributed systems. "
-            "At Amazon, I worked on high-throughput payment processing services handling millions of "
-            "transactions in a production environment."
+            "I have strong proficiency in Java, Python, REST APIs, and building scalable backend microservices, "
+            "along with hands-on experience in database optimization, distributed systems, and system design."
         ),
-        "relevant_skills": "Java, Python, Microservices, REST APIs, PostgreSQL"
+        "relevant_skills": "Java, Python, Microservices, REST APIs, Distributed Systems"
     },
     "frontend": {
         "keywords": ["frontend", "front-end", "react", "angular", "vue", "ui", "ux",
                      "javascript", "typescript", "css", "html", "web developer", "nextjs", "next.js"],
         "skill_lines": (
-            "I have hands-on experience with React, JavaScript, and modern frontend development "
-            "frameworks, along with expertise in responsive UI design and state management. "
-            "I enjoy building intuitive, performant user interfaces that deliver exceptional "
-            "user experiences at scale."
+            "I have hands-on experience with React, TypeScript, modern frontend frameworks, and responsive UI design, "
+            "along with expertise in state management and building performant user interfaces."
         ),
-        "relevant_skills": "React, JavaScript, TypeScript, HTML/CSS, UI/UX"
+        "relevant_skills": "React, TypeScript, JavaScript, HTML/CSS, UI/UX"
     },
     "devops_cloud": {
         "keywords": ["devops", "cloud", "aws", "azure", "gcp", "docker", "kubernetes", "k8s",
                      "ci/cd", "terraform", "infrastructure", "sre", "site reliability"],
         "skill_lines": (
-            "I have hands-on experience with Docker, AWS, and CI/CD pipeline design, with a "
-            "strong understanding of cloud-native architectures and infrastructure automation. "
-            "At Amazon, I worked closely with AWS services in a production environment and "
-            "understand operational excellence at scale."
+            "I have hands-on experience with Docker, AWS, CI/CD pipeline design, and cloud-native architectures, "
+            "with deep familiarity with infrastructure automation and operational excellence."
         ),
         "relevant_skills": "Docker, AWS, CI/CD, Kubernetes, Infrastructure"
     },
     "fullstack": {
         "keywords": ["full stack", "fullstack", "full-stack", "mern", "mean"],
         "skill_lines": (
-            "I have hands-on experience across the full stack — React and JavaScript on the frontend, "
-            "Python/FastAPI and Node.js on the backend, with PostgreSQL and MongoDB for data persistence. "
-            "At Amazon, I worked on end-to-end feature development spanning both client-facing UIs "
-            "and backend microservices."
+            "I have hands-on experience across the full stack with React, Node.js, Python, and SQL/NoSQL databases, "
+            "along with experience building end-to-end production features spanning both client UIs and backend microservices."
         ),
-        "relevant_skills": "React, Python, Node.js, PostgreSQL, System Design"
+        "relevant_skills": "React, Python, Node.js, PostgreSQL, Full-Stack"
     },
     "general_sde": {
         "keywords": [],  # fallback
         "skill_lines": (
-            "I have strong proficiency in C++, Python, and data structures & algorithms, with "
-            "experience building production-grade software systems. I bring a solid foundation "
-            "in system design, problem-solving, and writing clean, maintainable code that ships "
-            "reliably at scale."
+            "I have a strong foundation in C++, Java, Python, DSA, OOP, DBMS, and Computer Networks, "
+            "along with experience building full-stack projects."
         ),
-        "relevant_skills": "C++, Python, DSA, System Design, Git"
+        "relevant_skills": "C++, Java, Python, DSA, OOP, DBMS, Networks"
     }
 }
 
 
 # ──────────────────────────────────────────────────
-# MASTER EMAIL TEMPLATE
+# MASTER EMAIL TEMPLATE (Dev Mehta's Proven Format)
 # ──────────────────────────────────────────────────
 MASTER_TEMPLATE = """Hi {{name}},
 
 I hope you're doing well.
 
-I'm Dev Mehta, a Computer Engineering graduate from Thapar Institute of Engineering & Technology. I recently completed a 6-month Software Development Engineer internship at Amazon Pay India, where I worked on production systems and customer-facing features for a large-scale payment platform. I gained hands-on experience in software development, backend systems, debugging, and delivering reliable features in a production environment.
+I'm Dev Mehta, a Computer Engineering graduate from Thapar Institute of Engineering & Technology, and I recently completed a 6-month Software Development Engineer internship at Amazon Pay India.
 
-I came across the {{role}} opportunity at {{company}} and would be very interested in being considered for the role.
+During my internship, I worked on production backend and customer-facing systems, including a multi-marketplace runtime configuration migration and payment-related features using Java, runtime configuration, and feature flagging. I also worked on debugging distributed-system issues and contributed to design documents, code reviews, and operational dashboards.
 
-{{skill_lines}}
+I'm reaching out to explore {{role}} opportunities at {{company}}. {{skill_lines}}
 
-Please find my updated resume attached for your consideration. I'd be grateful for the opportunity to discuss my profile further.
+I would really appreciate it if you could consider my profile for any relevant current or upcoming openings at {{company}}.
 
-Thank you for your time and consideration.
+I've attached my resume for your consideration and would be happy to discuss my profile further.
+
+Thank you for your time.
 
 Best regards,
 Dev Mehta
@@ -221,15 +211,15 @@ class EmailCampaignTool:
         portfolio_url = p.get("links", {}).get("portfolio", "")
 
         if user_email:
-            contact_lines.append(f"Email: {user_email}")
+            contact_lines.append(f"📧 {user_email}")
         if user_phone:
-            contact_lines.append(f"Phone: {user_phone}")
-        if github_url:
-            contact_lines.append(f"GitHub: {github_url}")
+            contact_lines.append(f"📱 {user_phone}")
         if linkedin_url:
-            contact_lines.append(f"LinkedIn: {linkedin_url}")
+            contact_lines.append(f"🔗 LinkedIn: {linkedin_url}")
+        if github_url:
+            contact_lines.append(f"💻 GitHub: {github_url}")
         if portfolio_url:
-            contact_lines.append(f"Portfolio: {portfolio_url}")
+            contact_lines.append(f"🌐 Portfolio: {portfolio_url}")
 
         contact_block = "\n".join(contact_lines)
 

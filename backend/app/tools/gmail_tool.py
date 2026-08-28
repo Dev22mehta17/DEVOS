@@ -21,13 +21,14 @@ class GmailTool:
         phone = p.get("personal", {}).get("phone", "")
         links = p.get("links", {})
         
+        user_email = p.get("personal", {}).get("email_primary", "mehtadev2004@gmail.com")
         sig_lines = [
             f"\n\nBest regards,\n{name}",
-            f"{role}" if role else "",
-            f"Phone: {phone}" if phone else "",
-            f"LinkedIn: {links.get('linkedin', '')}" if links.get('linkedin') else "",
-            f"GitHub: {links.get('github', '')}" if links.get('github') else "",
-            f"Portfolio: {links.get('portfolio', '')}" if links.get('portfolio') else "",
+            f"📧 {user_email}" if user_email else "",
+            f"📱 {phone}" if phone else "",
+            f"🔗 LinkedIn: {links.get('linkedin', '')}" if links.get('linkedin') else "",
+            f"💻 GitHub: {links.get('github', '')}" if links.get('github') else "",
+            f"🌐 Portfolio: {links.get('portfolio', '')}" if links.get('portfolio') else "",
         ]
         return "\n".join([l for l in sig_lines if l])
 
