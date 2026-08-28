@@ -248,10 +248,18 @@ export default function App() {
               <button
                 className="chip-btn"
                 onClick={() => {
+                  setGoal("Send an email to mehtadev2004@gmail.com with my resume attached expressing interest in the Software Engineer position");
+                }}
+              >
+                ✉️ Email: "Send Direct Email + Resume"
+              </button>
+              <button
+                className="chip-btn"
+                onClick={() => {
                   setGoal("Send my intro to ananya@atlys.com (AI Engineer at Atlys), rahul@microsoft.com (Backend SDE at Microsoft), priya@google.com (ML Engineer at Google) tomorrow at 10 AM");
                 }}
               >
-                📧 Campaign: "Bulk Recruiter Outreach (3 targets)"
+                📇 Campaign: "Bulk Recruiter Outreach (3 targets)"
               </button>
               <button
                 className="chip-btn"
