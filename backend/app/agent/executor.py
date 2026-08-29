@@ -7,6 +7,8 @@ from app.agent.goal_interpreter import goal_interpreter
 from app.agent.planner import planner
 from app.agent.verifier import verifier
 from app.agent.recovery import recovery_engine
+from app.agent.tool_registry import tool_registry
+from app.agent.llm_agent import llm_agent
 
 from app.tools.browser_tool import browser_tool
 from app.tools.form_tool import form_tool
@@ -16,6 +18,7 @@ from app.tools.deep_research_tool import deep_research_tool
 from app.tools.recruiter_pipeline_tool import recruiter_pipeline_tool
 from app.tools.email_campaign_tool import email_campaign_tool
 from app.tools.campaign_scheduler import campaign_scheduler
+from app.tools.ats_adapters import ats_detector, ATSPlatform, greenhouse_adapter, lever_adapter, linkedin_adapter
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +28,7 @@ _event_broadcaster = None
 def set_event_broadcaster(fn):
     global _event_broadcaster
     _event_broadcaster = fn
+    llm_agent.set_broadcaster(fn)
 
 async def emit_agent_event(step_type: str, message: str, details: Dict[str, Any] = None):
     global _event_broadcaster
@@ -60,22 +64,41 @@ class AgentExecutor:
 
         # Step 3: Execute Steps based on Goal Type
         try:
-            # ─── A. Job Application Workflow ───
+            # ─── A. Job Application Workflow (ATS Multi-Platform Engine) ───
             if goal_type == GoalType.JOB_APPLICATION:
                 target_url = interpreted["target_url"]
+                platform = ats_detector.detect_from_url(target_url)
                 
-                # Step 1 & 2: Navigation & Form Inspection
-                await emit_agent_event("DOM_ACTION", f"Step 1/7: Navigating to target portal: {target_url}")
-                await emit_agent_event("DOM_ACTION", "Step 2/7: Inspecting input controls, radio groups, and file uploaders...")
+                await emit_agent_event("DOM_ACTION", f"Step 1/7: Navigating to {platform.value} portal: {target_url}")
+                await emit_agent_event("DOM_ACTION", f"Step 2/7: Inspecting application inputs and control elements...")
                 await emit_agent_event("MEMORY_QUERY", "Step 3/7: Retrieving candidate profile attributes & matching resume...")
 
-                if "docs.google.com/forms" in target_url or "forms.gle" in target_url:
+                if platform == ATSPlatform.GREENHOUSE:
+                    await emit_agent_event("DOM_ACTION", "Step 4/7: Detected Greenhouse ATS. Running Greenhouse Adapter...")
+                    form_res = await greenhouse_adapter.fill_application(target_url, goal_text)
+
+                elif platform == ATSPlatform.LEVER:
+                    await emit_agent_event("DOM_ACTION", "Step 4/7: Detected Lever ATS. Running Lever Adapter...")
+                    form_res = await lever_adapter.fill_application(target_url, goal_text)
+
+                elif platform == ATSPlatform.LINKEDIN:
+                    await emit_agent_event("DOM_ACTION", "Step 4/7: Detected LinkedIn Job. Running LinkedIn Easy Apply Wizard...")
+                    form_res = await linkedin_adapter.apply_to_job(target_url, goal_text)
+
+                elif platform == ATSPlatform.GOOGLE_FORMS:
+                    await emit_agent_event("DOM_ACTION", "Step 4/7: Detected Google Form. Running Google Form Engine...")
                     form_res = await form_tool.process_form(target_url)
+
                 else:
+                    await emit_agent_event("DOM_ACTION", "Step 4/7: Running Universal Web Application Engine...")
                     form_res = await universal_web_tool.execute_web_task(target_url, goal_text)
 
                 if form_res.get("status") == "PAGE_NOT_FOUND":
                     await emit_agent_event("COMPLETED", f"⚠️ Error: The target link returned 'Page not found' (404). Please verify that the link is accessible.")
+                    return form_res
+
+                if form_res.get("status") == "NOT_EASY_APPLY":
+                    await emit_agent_event("COMPLETED", f"⚠️ Notice: {form_res.get('message')}")
                     return form_res
 
                 filled_count = len(form_res.get("payload", {}).get("filled_fields", []))
@@ -85,8 +108,8 @@ class AgentExecutor:
                     await emit_agent_event("COMPLETED", f"⚠️ No form fields detected on {target_url}. Page may be restricted or require sign-in.")
                     return form_res
 
-                await emit_agent_event("DOM_ACTION", f"Step 4/7: Populated {filled_count} fields directly on open Chrome page.")
-                await emit_agent_event("APPROVAL_REQUIRED", f"Step 5/7: Review sheet ready ({filled_count} fields populated). Click Approve & Submit on Chrome.", form_res["payload"])
+                await emit_agent_event("DOM_ACTION", f"Step 5/7: Populated {filled_count} fields directly on open Chrome page.")
+                await emit_agent_event("APPROVAL_REQUIRED", f"Step 6/7: Review sheet ready ({filled_count} fields populated). Review & Submit.", form_res.get("payload", {}))
                 return form_res
 
             # ─── B. Deep Research & Dossier Workflow ───
@@ -170,7 +193,7 @@ class AgentExecutor:
                     await emit_agent_event("APPROVAL_REQUIRED", f"Step 2/3: Email draft prepared for {recipient}. Review in popup.", draft_res["payload"])
                     return draft_res
 
-            # ─── E. Universal Search Workflow ───
+            # ─── E. Universal Search / General Execution Workflow ───
             else:
                 query = interpreted.get("query", goal_text)
                 search_url = f"https://www.google.com/search?q={query.replace(' ', '+')}"
@@ -194,7 +217,7 @@ class AgentExecutor:
                 return {"status": "COMPLETED", **search_data}
 
         except Exception as e:
-            logger.error(f"[AgentExecutor] Execution error: {e}")
+            logger.error(f"[AgentExecutor] Execution error: {e}", exc_info=True)
             await emit_agent_event("STEP_FAILED", f"Agent execution error: {str(e)}")
             return {"status": "ERROR", "message": str(e)}
 

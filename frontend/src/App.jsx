@@ -248,6 +248,30 @@ export default function App() {
               <button
                 className="chip-btn"
                 onClick={() => {
+                  setGoal("Fill out the Greenhouse job application at https://boards.greenhouse.io/<company>/jobs/<id> with my resume");
+                }}
+              >
+                💼 Greenhouse: "Autofill Application"
+              </button>
+              <button
+                className="chip-btn"
+                onClick={() => {
+                  setGoal("Apply to the Lever job post at https://jobs.lever.co/<company>/<id> with my resume");
+                }}
+              >
+                🏢 Lever: "Apply to Job Post"
+              </button>
+              <button
+                className="chip-btn"
+                onClick={() => {
+                  setGoal("Easy Apply to the LinkedIn job at https://www.linkedin.com/jobs/view/<id>");
+                }}
+              >
+                🔗 LinkedIn: "Easy Apply Assistant"
+              </button>
+              <button
+                className="chip-btn"
+                onClick={() => {
                   setGoal("Send an email to mehtadev2004@gmail.com with my resume attached expressing interest in the Software Engineer position");
                 }}
               >
