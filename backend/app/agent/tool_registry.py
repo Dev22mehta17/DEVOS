@@ -111,18 +111,116 @@ class ToolRegistry:
         logger.debug(f"[ToolRegistry] Registered tool: {name} (Risk: {risk_level.value})")
 
     def get_tool(self, name: str) -> Optional[ToolDefinition]:
+        self._ensure_default_tools()
         return self._tools.get(name)
 
     def list_tools(self) -> List[ToolDefinition]:
+        self._ensure_default_tools()
         return list(self._tools.values())
 
     def get_gemini_tools(self) -> List[Dict[str, Any]]:
         """Returns all registered tool schemas formatted for Gemini function calling."""
+        self._ensure_default_tools()
         return [t.to_gemini_declaration() for t in self._tools.values()]
 
     def get_openai_tools(self) -> List[Dict[str, Any]]:
         """Returns all registered tool schemas formatted for OpenAI / vLLM function calling."""
+        self._ensure_default_tools()
         return [t.to_openai_declaration() for t in self._tools.values()]
+
+    def _ensure_default_tools(self):
+        """Lazy-registers default tools if empty."""
+        if self._tools:
+            return
+
+        from app.tools.browser_tool import browser_tool
+        from app.core.memory_engine import memory_engine
+        from app.tools.form_tool import form_tool
+        from app.tools.ats_adapters import greenhouse_adapter, lever_adapter, linkedin_adapter
+        from app.tools.email_campaign_tool import email_campaign_tool
+        from app.tools.recruiter_pipeline_tool import recruiter_pipeline_tool
+        from app.tools.deep_research_tool import deep_research_tool
+
+        self.register(
+            name="open_url",
+            description="Navigates Chrome browser to a given web URL.",
+            parameters={"url": {"type": "string", "description": "The full URL to open", "required": True}},
+            risk_level=ActionRiskLevel.LOW,
+            handler=browser_tool.navigate,
+            category="browser"
+        )
+        self.register(
+            name="search_memory",
+            description="Searches candidate vector memory and resume achievements for relevant context.",
+            parameters={"query": {"type": "string", "description": "Query topic", "required": True}},
+            risk_level=ActionRiskLevel.LOW,
+            handler=lambda query: memory_engine.query_semantic_memory(query, top_k=4),
+            category="memory"
+        )
+        self.register(
+            name="get_candidate_profile",
+            description="Retrieves candidate structured profile (education, CGPA, Amazon Pay internship, skills, links).",
+            parameters={},
+            risk_level=ActionRiskLevel.LOW,
+            handler=lambda: memory_engine.profile_data,
+            category="memory"
+        )
+        self.register(
+            name="fill_greenhouse_form",
+            description="Autofills a job application on Greenhouse ATS (boards.greenhouse.io).",
+            parameters={"url": {"type": "string", "description": "Greenhouse application URL", "required": True}},
+            risk_level=ActionRiskLevel.HIGH,
+            handler=greenhouse_adapter.fill_application,
+            category="ats"
+        )
+        self.register(
+            name="fill_lever_form",
+            description="Autofills a job application on Lever ATS (jobs.lever.co).",
+            parameters={"url": {"type": "string", "description": "Lever application URL", "required": True}},
+            risk_level=ActionRiskLevel.HIGH,
+            handler=lever_adapter.fill_application,
+            category="ats"
+        )
+        self.register(
+            name="start_linkedin_easy_apply",
+            description="Automates LinkedIn Easy Apply wizard with screening questions.",
+            parameters={"job_url": {"type": "string", "description": "LinkedIn job URL", "required": True}},
+            risk_level=ActionRiskLevel.HIGH,
+            handler=linkedin_adapter.apply_to_job,
+            category="ats"
+        )
+        self.register(
+            name="autofill_job_application",
+            description="Autofills Google Forms or general web job applications.",
+            parameters={"url": {"type": "string", "description": "Target application URL", "required": True}},
+            risk_level=ActionRiskLevel.HIGH,
+            handler=form_tool.process_form,
+            category="form"
+        )
+        self.register(
+            name="prepare_recruiter_email_campaign",
+            description="Prepares a personalized recruiter outreach email campaign with schedule.",
+            parameters={"goal_text": {"type": "string", "description": "Prompt with recipient emails", "required": True}},
+            risk_level=ActionRiskLevel.HIGH,
+            handler=email_campaign_tool.prepare_campaign,
+            category="email"
+        )
+        self.register(
+            name="triage_recruiter_inbox",
+            description="Scans Gmail for recruiter emails and generates actionable reply drafts.",
+            parameters={},
+            risk_level=ActionRiskLevel.HIGH,
+            handler=recruiter_pipeline_tool.scan_and_triage_recruiter_threads,
+            category="email"
+        )
+        self.register(
+            name="perform_web_search",
+            description="Searches Google and extracts technical summaries and comparison dossiers.",
+            parameters={"query": {"type": "string", "description": "Search query", "required": True}},
+            risk_level=ActionRiskLevel.LOW,
+            handler=deep_research_tool.research_topic_or_comparison,
+            category="search"
+        )
 
     async def execute(self, tool_name: str, arguments: Dict[str, Any], action_id: Optional[str] = None) -> Dict[str, Any]:
         """Executes a registered tool with automated HITL risk verification."""
