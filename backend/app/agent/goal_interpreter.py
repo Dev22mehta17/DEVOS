@@ -107,12 +107,21 @@ class GoalInterpreter:
         is_pipeline = any(k in text_lower for k in [
             "recruiter pipeline", "check recruiter", "all recruiter",
             "scan inbox", "triage recruiter", "recruiter queue",
-            "pending recruiter", "triage my response"
+            "pending recruiter", "triage my response", "triage email", "triage inbox"
         ])
         if is_pipeline:
+            custom_kws = None
+            kw_match = re.search(r'(?:keywords?|for|containing|words?)\s*[:=]?\s*([a-zA-Z0-9_\-,\s]+?)(?:&|and\s+triage|$)', text_clean, re.IGNORECASE)
+            if kw_match:
+                raw_extracted = kw_match.group(1).strip()
+                tokens = [t.strip() for t in re.split(r'[,/|\s]+', raw_extracted) if t.strip() and t.lower() not in ["recruiter", "emails", "my", "response", "queue", "and", "the", "inbox", "triage", "check"]]
+                if tokens:
+                    custom_kws = tokens
+
             return {
                 "goal_type": GoalType.RECRUITER_PIPELINE,
                 "action_kind": "TRIAGE_RECRUITERS",
+                "keywords": custom_kws,
                 "original_prompt": text_clean,
                 "requires_hitl": True
             }

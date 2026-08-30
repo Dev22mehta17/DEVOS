@@ -129,9 +129,11 @@ class AgentExecutor:
 
             # ─── C. Proactive Recruiter Pipeline Workflow ───
             elif goal_type == GoalType.RECRUITER_PIPELINE:
-                await emit_agent_event("DOM_ACTION", "Step 1/3: Scanning Gmail for active recruiter threads & interview invites...")
+                custom_kws = interpreted.get("keywords")
+                kw_display = f" (Keywords: {', '.join(custom_kws)})" if custom_kws else ""
+                await emit_agent_event("DOM_ACTION", f"Step 1/3: Scanning Gmail for active recruiter threads{kw_display}...")
                 
-                pipeline_data = await recruiter_pipeline_tool.scan_and_triage_recruiter_threads()
+                pipeline_data = await recruiter_pipeline_tool.scan_and_triage_recruiter_threads(custom_keywords=custom_kws)
                 
                 total_items = pipeline_data.get("total_threads", 0)
                 await emit_agent_event("DOM_ACTION", f"Step 2/3: Triaged {total_items} recruiter threads into action categories & tailored draft replies.")

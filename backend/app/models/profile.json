@@ -70,5 +70,14 @@
       "google": "Drawn to Google's engineering excellence, distributed database architectures, and bleeding-edge AI agent frameworks."
     },
     "custom_user_notes": "I am actively looking for SDE-1 / Software Engineer roles with high ownership and challenging distributed systems problems."
+  },
+  "triage_settings": {
+    "keywords": [
+      "recruiter",
+      "interview",
+      "hiring",
+      "opportunity",
+      "assessment"
+    ]
   }
 }

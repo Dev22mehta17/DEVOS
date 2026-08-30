@@ -12,11 +12,18 @@ class RecruiterPipelineTool:
     """Proactive email triage engine that scans recruiter threads and generates batch actionable drafts."""
 
     @staticmethod
-    async def scan_and_triage_recruiter_threads() -> Dict[str, Any]:
-        logger.info("[RecruiterPipeline] Scanning Gmail for active recruiter threads...")
+    async def scan_and_triage_recruiter_threads(custom_keywords: List[str] = None) -> Dict[str, Any]:
+        # 1. Load keywords from arguments, profile memory, or default list
+        profile_kw = memory_engine.profile_data.get("triage_settings", {}).get("keywords", [])
+        keywords = custom_keywords or profile_kw or ["recruiter", "interview", "hiring", "opportunity", "assessment"]
+        
+        # Clean & format query
+        clean_kws = [k.strip() for k in keywords if k.strip()]
+        search_query = " OR ".join(clean_kws) if clean_kws else "recruiter OR interview OR hiring OR opportunity OR assessment"
+        
+        logger.info(f"[RecruiterPipeline] Scanning Gmail with keywords: {clean_kws} (Query: {search_query})")
         
         page = await browser_tool.get_active_page()
-        search_query = "recruiter OR interview OR hiring OR opportunity OR assessment"
         search_url = f"https://mail.google.com/mail/u/0/#search/{search_query.replace(' ', '+')}"
 
         try:
@@ -140,7 +147,9 @@ class RecruiterPipelineTool:
             return {
                 "status": "PIPELINE_READY",
                 "total_threads": len(triaged_items),
-                "items": triaged_items
+                "items": triaged_items,
+                "scanned_keywords": clean_kws,
+                "search_query": search_query
             }
 
         except Exception as e:

@@ -96,6 +96,18 @@ export default function RecruiterQueueModal({ queueData, onApproveItem, onApprov
           </div>
         </div>
 
+        {/* Scanned Keywords Filter Indicator */}
+        {queueData.scanned_keywords && queueData.scanned_keywords.length > 0 && (
+          <div style={{ padding: '0.6rem 1.5rem', background: 'rgba(0,0,0,0.3)', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', fontWeight: 500 }}>🔍 Filter Keywords:</span>
+            {queueData.scanned_keywords.map((kw, idx) => (
+              <span key={idx} style={{ fontSize: '0.72rem', background: 'rgba(255,255,255,0.06)', color: 'var(--accent-cyan)', padding: '2px 8px', borderRadius: '6px', border: '1px solid rgba(0,242,254,0.2)' }}>
+                {kw}
+              </span>
+            ))}
+          </div>
+        )}
+
         {/* Scrollable Items List */}
         <div style={{ overflowY: 'auto', padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {items.map((item) => {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Database, User, Briefcase, GraduationCap, Link as LinkIcon, Save, FileUp, Sparkles, FileText } from 'lucide-react';
+import { Database, User, Briefcase, GraduationCap, Link as LinkIcon, Save, FileUp, Sparkles, FileText, Mail } from 'lucide-react';
 
 export default function MemoryManager({ profile, onSave }) {
   const [memoryData, setMemoryData] = useState(profile || {});
@@ -215,6 +215,32 @@ export default function MemoryManager({ profile, onSave }) {
             onChange={(e) => handleChange('links', 'portfolio', e.target.value)}
             placeholder="Portfolio / Website URL (e.g. https://devmehta.dev)"
           />
+        </div>
+
+        {/* Recruiter Triage Search Keywords */}
+        <div>
+          <div style={{ color: 'var(--accent-cyan)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.3rem' }}>
+            <Mail size={15} /> Recruiter Inbox Search Keywords
+          </div>
+          <input
+            className="prompt-input"
+            style={{ width: '100%', fontSize: '0.84rem' }}
+            value={Array.isArray(memoryData.triage_settings?.keywords) ? memoryData.triage_settings.keywords.join(', ') : (memoryData.triage_settings?.keywords || 'recruiter, interview, hiring, opportunity, assessment')}
+            onChange={(e) => {
+              const kwList = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+              setMemoryData(prev => ({
+                ...prev,
+                triage_settings: {
+                  ...(prev.triage_settings || {}),
+                  keywords: kwList
+                }
+              }));
+            }}
+            placeholder="e.g. recruiter, interview, hiring, opportunity, referral, amazon"
+          />
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+            Separate search keywords with commas. DevOS queries Gmail with these terms.
+          </div>
         </div>
 
         <button type="submit" className="action-btn" style={{ width: '100%', justifyContent: 'center', marginTop: '0.4rem', padding: '0.65rem' }}>
