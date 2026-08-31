@@ -389,21 +389,49 @@ Custom Notes: {extra.get('custom_user_notes', '')}
                        any(k in degree.lower() for k in ["m.tech", "master", "m.s"]):
                         return {"matched_option": opt, "confidence": "high"}
 
-        # --- Notice period ---
-        if "notice" in q_lower:
-            notice = self.profile_data.get("professional", {}).get("notice_period", "")
-            if notice:
-                for opt in options:
-                    if "immediate" in opt.lower() and "immediate" in notice.lower():
-                        return {"matched_option": opt, "confidence": "high"}
-                    if "15" in opt and "15" in notice:
-                        return {"matched_option": opt, "confidence": "high"}
-
-        # --- Generic fallback for Yes/No questions ---
-        if len(options) == 2 and any(o.lower() == "yes" for o in options) and any(o.lower() == "no" for o in options):
+        # --- Notice Period / Joining Date ---
+        if any(k in q_lower for k in ["notice", "join", "joining", "soon", "start date", "availability to join"]) or \
+           any("immediate" in opt.lower() or "15 days" in opt.lower() or "30 days" in opt.lower() for opt in options):
+            notice = self.profile_data.get("professional", {}).get("notice_period", "Immediate").lower()
             for opt in options:
-                if opt.lower() == "yes":
-                    return {"matched_option": opt, "confidence": "medium"}
+                ol = opt.lower().strip()
+                if "immediate" in ol and ("immediate" in notice or not notice):
+                    return {"matched_option": opt, "confidence": "high"}
+                if "15" in ol and "15" in notice:
+                    return {"matched_option": opt, "confidence": "high"}
+                if "30" in ol and "30" in notice:
+                    return {"matched_option": opt, "confidence": "high"}
+            for opt in options:
+                if "immediate" in opt.lower():
+                    return {"matched_option": opt, "confidence": "high"}
+
+        # --- Internship Duration & Months Availability ---
+        # e.g., "Are you available for 6 months?", "Can you commit for 3-6 months?"
+        if any(k in q_lower for k in ["available for", "months", "duration", "commitment", "6 month", "3 month", "full time intern"]):
+            for opt in options:
+                if opt.lower().strip() in ["yes", "yes, available", "yes, I am", "yes, can commit"]:
+                    return {"matched_option": opt, "confidence": "high"}
+
+        # --- Location & WFO / Relocation / Office Questions ---
+        # e.g., "Are you comfortable with the noida location-WFO?", "Are you willing to work from Gurgaon office?"
+        if any(k in q_lower for k in ["location", "wfo", "office", "noida", "gurgaon", "gurugram", "bengaluru", "bangalore", "pune", "hyderabad", "delhi", "mumbai", "relocate", "relocation", "on-site", "hybrid", "work from"]):
+            for opt in options:
+                if opt.lower().strip() in ["yes", "yes, comfortable", "yes, willing", "yes, open", "yes - wfo"]:
+                    return {"matched_option": opt, "confidence": "high"}
+
+        # --- Yes/No Fallback for any question having Yes and No (including Yes/No/Maybe) ---
+        has_yes = any(opt.lower().strip() == "yes" or opt.lower().strip().startswith("yes") for opt in options)
+        has_no = any(opt.lower().strip() == "no" or opt.lower().strip().startswith("no") for opt in options)
+        if has_yes and has_no:
+            # Check if question is asking for criminal/disqualification (No) or positive qualification (Yes)
+            if any(k in q_lower for k in ["criminal", "convicted", "fired", "sponsorship in future", "backlog"]):
+                for opt in options:
+                    if opt.lower().strip() == "no":
+                        return {"matched_option": opt, "confidence": "high"}
+            else:
+                for opt in options:
+                    if opt.lower().strip() == "yes" or opt.lower().strip().startswith("yes"):
+                        return {"matched_option": opt, "confidence": "medium"}
 
         return None
 

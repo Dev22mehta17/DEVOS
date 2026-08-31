@@ -167,7 +167,7 @@ async def approve_action(req: ActionApprovalRequest):
         else:
             await push_stream_event("COMPLETED", f"⚠️ Email send issue: {res.get('message', 'Unknown error')}")
         return res
-    elif "form" in req.action_id or "web" in req.action_id:
+    elif any(k in req.action_id for k in ["form", "web", "greenhouse", "lever", "linkedin"]):
         res = await form_tool.submit_form(req.action_id, req.payload)
         if res.get("submitted_on_chrome"):
             verified = "✅ Verified!" if res.get("verified") else "(click verification pending)"

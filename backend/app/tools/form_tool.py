@@ -313,34 +313,31 @@ class FormTool:
         if approval_payload:
             all_fields = approval_payload.get("updated_fields", []) or approval_payload.get("filled_fields", [])
 
+        logger.info(f"[FormTool] Applying {len(all_fields)} fields to form before submission...")
         text_idx = 0
         for f in all_fields:
             ft = f.get("fieldType", "text")
             val = f.get("value", "")
+            f_label = f.get("field_label", "")
+            f_qidx = f.get("questionIndex")
 
             if ft == "text" and val and not str(val).startswith("[ATTACHED FILE]"):
                 f_idx = f.get("index", text_idx)
                 f_name = f.get("name", "")
-                f_label = f.get("field_label", "")
-                f_qidx = f.get("questionIndex")
                 await browser_tool.fill_input_by_index_or_name(f_idx, f_name, str(val), label=f_label, question_index=f_qidx)
                 text_idx += 1
 
             elif ft == "radio" and val:
-                q_idx = f.get("questionIndex", 0)
-                label = f.get("field_label", "")
-                await browser_tool.select_radio_option(q_idx, str(val), label)
+                await browser_tool.select_radio_option(f_qidx, str(val), f_label)
 
             elif ft == "checkbox" and val:
-                q_idx = f.get("questionIndex", 0)
-                label = f.get("field_label", "")
-                selected_opts = [v.strip() for v in str(val).split(",")]
-                await browser_tool.select_checkbox_options(q_idx, selected_opts, label)
+                selected_opts = [v.strip() for v in str(val).split(",") if v.strip()]
+                await browser_tool.select_checkbox_options(f_qidx, selected_opts, f_label)
 
             elif ft == "dropdown" and val:
-                q_idx = f.get("questionIndex", 0)
-                label = f.get("field_label", "")
-                await browser_tool.select_dropdown_option(q_idx, str(val), label)
+                await browser_tool.select_dropdown_option(f_qidx, str(val), f_label)
+
+        await asyncio.sleep(0.6)
 
         # Step 2: Upload resume
         selected_res = approval_payload.get("selected_resume") if approval_payload else None

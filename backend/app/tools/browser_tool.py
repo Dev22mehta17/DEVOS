@@ -489,72 +489,71 @@ class BrowserTool:
                 const targetLabel = cleanStr(qLabel);
                 const targetWords = targetLabel.split(' ').filter(w => w.length > 1);
 
-                const blocks = Array.from(document.querySelectorAll('div[role="listitem"], fieldset, .freebirdFormviewerViewNumberedItemContainer, .geS5n'));
-
-                let targetBlock = null;
-                if (qIdx !== null && qIdx !== undefined && qIdx < blocks.length) {
-                    targetBlock = blocks[qIdx];
+                // Use ONLY top-level question blocks (div[role="listitem"])
+                let blocks = Array.from(document.querySelectorAll('div[role="listitem"]'));
+                if (blocks.length === 0) {
+                    blocks = Array.from(document.querySelectorAll('.geS5n, fieldset'));
                 }
 
-                if (!targetBlock && targetLabel) {
+                let targetBlock = null;
+
+                // 1. Match by question heading label first
+                if (targetLabel) {
                     let bestScore = 0;
                     blocks.forEach((b) => {
-                        const headingEl = b.querySelector('div[role="heading"], .M7eMe, legend, label');
+                        const headingEl = b.querySelector('.M7eMe, div[role="heading"], label, legend, span');
                         if (!headingEl) return;
                         const hText = cleanStr(headingEl.innerText);
                         if (!hText) return;
                         const hWords = hText.split(' ').filter(w => w.length > 1);
 
                         let score = 0;
-                        if (hText === targetLabel) {
+                        if (hText.includes(targetLabel) || targetLabel.includes(hText)) {
                             score = 1000;
                         } else {
                             let common = 0;
                             targetWords.forEach(w => {
                                 if (hWords.includes(w)) common++;
                             });
-                            const total = new Set([...targetWords, ...hWords]).size;
-                            score = total > 0 ? (common / total) * 100 : 0;
+                            score = common * 10;
                         }
 
-                        if (score > bestScore && score >= 35) {
+                        if (score > bestScore && score > 0) {
                             bestScore = score;
                             targetBlock = b;
                         }
                     });
                 }
 
-                // Search within targetBlock, then fallback to whole document
-                const roots = targetBlock ? [targetBlock, document] : [document];
+                // 2. Fallback to index if label match didn't find block
+                if (!targetBlock && qIdx !== null && qIdx !== undefined && qIdx < blocks.length) {
+                    targetBlock = blocks[qIdx];
+                }
 
-                for (const searchRoot of roots) {
-                    const radios = Array.from(searchRoot.querySelectorAll('div[role="radio"], label[role="radio"], input[type="radio"], .docssharedWizToggleLabeledContainer'));
+                const searchRoots = targetBlock ? [targetBlock] : blocks;
 
-                    for (const el of radios) {
-                        const radioInput = el.getAttribute('role') === 'radio' ? el : el.querySelector('div[role="radio"], input[type="radio"]') || el;
-                        const rValue = (radioInput.getAttribute('data-value') || radioInput.value || '').toLowerCase().trim();
-                        const rText = (el.innerText || '').toLowerCase().trim();
-                        const rAria = (radioInput.getAttribute('aria-label') || '').toLowerCase().trim();
+                for (const searchRoot of searchRoots) {
+                    const containers = Array.from(searchRoot.querySelectorAll('.docssharedWizToggleLabeledContainer, div[role="radio"], label, .nWQGrd, input[type="radio"]'));
 
-                        if (rValue === optClean || rText.includes(optClean) || rAria.includes(optClean) || optClean.includes(rValue)) {
-                            radioInput.scrollIntoView({ behavior: 'auto', block: 'center' });
+                    for (const cont of containers) {
+                        const radioEl = cont.getAttribute('role') === 'radio' ? cont : (cont.querySelector('div[role="radio"], input[type="radio"]') || cont);
+                        const rValue = (radioEl.getAttribute('data-value') || radioEl.getAttribute('aria-label') || radioEl.value || '').toLowerCase().trim();
+                        const rText = (cont.innerText || '').toLowerCase().trim();
 
-                            // Trigger click on radio and parent containers
-                            radioInput.click();
-                            el.click();
+                        if (rValue === optClean || rText === optClean || rText.startsWith(optClean) || rValue.startsWith(optClean) || (optClean.length >= 3 && (rValue.includes(optClean) || rText.includes(optClean)))) {
+                            cont.scrollIntoView({ behavior: 'auto', block: 'center' });
+                            
+                            try { cont.click(); } catch(e) {}
+                            try { radioEl.click(); } catch(e) {}
+                            
+                            ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click', 'change', 'input'].forEach(evtName => {
+                                try { radioEl.dispatchEvent(new Event(evtName, { bubbles: true, cancelable: true })); } catch(e) {}
+                                try { cont.dispatchEvent(new Event(evtName, { bubbles: true, cancelable: true })); } catch(e) {}
+                            });
 
-                            const span = el.querySelector('span');
-                            if (span) span.click();
-
-                            // Dispatch synthetic click & change events
-                            radioInput.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
-                            radioInput.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
-                            radioInput.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
-                            radioInput.dispatchEvent(new Event('change', { bubbles: true }));
-
-                            radioInput.setAttribute('aria-checked', 'true');
-                            if (radioInput.tagName && radioInput.tagName.toLowerCase() === 'input') {
-                                radioInput.checked = true;
+                            radioEl.setAttribute('aria-checked', 'true');
+                            if (radioEl.tagName && radioEl.tagName.toLowerCase() === 'input') {
+                                radioEl.checked = true;
                             }
                             return true;
                         }
@@ -681,10 +680,33 @@ class BrowserTool:
             return False
         try:
             clicked = await self.page.evaluate("""() => {
-                const btn = Array.from(document.querySelectorAll('div[role="button"], span, button, input[type="submit"]'))
-                    .find(el => el.innerText && el.innerText.trim().toLowerCase() === 'submit');
-                if (btn) {
-                    btn.click();
+                const buttons = Array.from(document.querySelectorAll('div[role="button"], span.NPEfkd, span.RveJvd, button, input[type="submit"], a.postings-btn, .freebirdFormviewerViewNavigationButtons div[role="button"]'));
+                
+                // 1. Submit button
+                const submitBtn = buttons.find(el => {
+                    const txt = (el.innerText || el.value || el.getAttribute('aria-label') || '').trim().toLowerCase();
+                    return txt === 'submit' || txt === 'submit application' || txt === 'send application' || txt === 'apply now';
+                });
+                if (submitBtn) {
+                    submitBtn.scrollIntoView({ behavior: 'auto', block: 'center' });
+                    submitBtn.click();
+                    ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(evt => {
+                        submitBtn.dispatchEvent(new Event(evt, { bubbles: true, cancelable: true }));
+                    });
+                    return true;
+                }
+
+                // 2. Multi-step Next button
+                const nextBtn = buttons.find(el => {
+                    const txt = (el.innerText || el.value || el.getAttribute('aria-label') || '').trim().toLowerCase();
+                    return txt === 'next' || txt === 'continue';
+                });
+                if (nextBtn) {
+                    nextBtn.scrollIntoView({ behavior: 'auto', block: 'center' });
+                    nextBtn.click();
+                    ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(evt => {
+                        nextBtn.dispatchEvent(new Event(evt, { bubbles: true, cancelable: true }));
+                    });
                     return true;
                 }
                 return false;

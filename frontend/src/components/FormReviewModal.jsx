@@ -14,6 +14,8 @@ export default function FormReviewModal({ formData, onApprove, onReject }) {
   const [generatingFieldIdx, setGeneratingFieldIdx] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const getFieldKey = (f, idx) => f.field_id || `q_${f.questionIndex !== undefined ? f.questionIndex : idx}_${f.field_label}`;
+
   useEffect(() => {
     if (filled_fields) {
       const unique = [];
@@ -32,7 +34,8 @@ export default function FormReviewModal({ formData, onApprove, onReject }) {
     if (flagged_fields) {
       const answers = {};
       flagged_fields.forEach((f, i) => {
-        answers[i] = f.fieldType === 'checkbox' ? [] : '';
+        const key = getFieldKey(f, i);
+        answers[key] = f.fieldType === 'checkbox' ? [] : (f.value || '');
       });
       setUserAnswers(answers);
     }
@@ -82,17 +85,17 @@ export default function FormReviewModal({ formData, onApprove, onReject }) {
     setFields(updated);
   };
 
-  const handleFlaggedChange = (index, newValue) => {
-    setUserAnswers(prev => ({ ...prev, [index]: newValue }));
+  const handleFlaggedChange = (key, newValue) => {
+    setUserAnswers(prev => ({ ...prev, [key]: newValue }));
   };
 
-  const handleCheckboxToggle = (flagIndex, option) => {
+  const handleCheckboxToggle = (key, option) => {
     setUserAnswers(prev => {
-      const current = Array.isArray(prev[flagIndex]) ? [...prev[flagIndex]] : [];
+      const current = Array.isArray(prev[key]) ? [...prev[key]] : [];
       if (current.includes(option)) {
-        return { ...prev, [flagIndex]: current.filter(o => o !== option) };
+        return { ...prev, [key]: current.filter(o => o !== option) };
       } else {
-        return { ...prev, [flagIndex]: [...current, option] };
+        return { ...prev, [key]: [...current, option] };
       }
     });
   };
@@ -119,8 +122,8 @@ export default function FormReviewModal({ formData, onApprove, onReject }) {
     }
   };
 
-  const handleGenerateFlaggedAI = async (flagIdx, label) => {
-    setGeneratingFieldIdx(`flag_${flagIdx}`);
+  const handleGenerateFlaggedAI = async (key, label) => {
+    setGeneratingFieldIdx(`flag_${key}`);
     try {
       const res = await fetch('http://localhost:8000/api/generate-answer', {
         method: 'POST',
@@ -132,7 +135,7 @@ export default function FormReviewModal({ formData, onApprove, onReject }) {
       });
       const data = await res.json();
       if (data.answer) {
-        handleFlaggedChange(flagIdx, data.answer);
+        handleFlaggedChange(key, data.answer);
       }
     } catch (err) {
       console.error('AI answer generation error:', err);
@@ -147,8 +150,10 @@ export default function FormReviewModal({ formData, onApprove, onReject }) {
     const mergedFields = [...fields];
     if (flagged_fields) {
       flagged_fields.forEach((f, i) => {
-        const answer = userAnswers[i];
-        if (answer && (typeof answer === 'string' ? answer.trim() : answer.length > 0)) {
+        if (f.is_file) return;
+        const key = getFieldKey(f, i);
+        const answer = userAnswers[key];
+        if (answer !== undefined && answer !== null && (typeof answer === 'string' ? answer.trim() !== '' : answer.length > 0)) {
           mergedFields.push({
             field_label: f.field_label,
             field_id: f.field_id,
@@ -335,90 +340,93 @@ export default function FormReviewModal({ formData, onApprove, onReject }) {
                 <span>⚠ {flagged_fields.length} Fields Need Your Input:</span>
               </div>
 
-              {flagged_fields.filter(f => !f.is_file).map((f, i) => (
-                <div key={i} style={{ marginBottom: '0.8rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>
-                      {f.field_label}
-                      {f.fieldType && f.fieldType !== 'text' && (
-                        <span style={{ ...badgeStyle('#ff9800', 'rgba(255,152,0,0.15)'), marginLeft: '0.5rem' }}>{f.fieldType}</span>
-                      )}
+              {flagged_fields.filter(f => !f.is_file).map((f, i) => {
+                const key = getFieldKey(f, i);
+                return (
+                  <div key={key} style={{ marginBottom: '0.8rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                        {f.field_label}
+                        {f.fieldType && f.fieldType !== 'text' && (
+                          <span style={{ ...badgeStyle('#ff9800', 'rgba(255,152,0,0.15)'), marginLeft: '0.5rem' }}>{f.fieldType}</span>
+                        )}
+                      </div>
+                      {/* Instant AI Answer Generator Button for Flagged Questions */}
+                      <button
+                        type="button"
+                        onClick={() => handleGenerateFlaggedAI(key, f.field_label)}
+                        disabled={generatingFieldIdx === `flag_${key}`}
+                        style={{
+                          background: 'rgba(127,0,255,0.15)',
+                          border: '1px solid var(--accent-purple)',
+                          color: 'var(--accent-purple)',
+                          fontSize: '0.74rem',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.3rem',
+                          fontWeight: 600
+                        }}
+                      >
+                        <Sparkles size={11} />
+                        {generatingFieldIdx === `flag_${key}` ? 'Generating...' : '✨ Generate with AI'}
+                      </button>
                     </div>
-                    {/* Instant AI Answer Generator Button for Flagged Questions */}
-                    <button
-                      type="button"
-                      onClick={() => handleGenerateFlaggedAI(i, f.field_label)}
-                      disabled={generatingFieldIdx === `flag_${i}`}
-                      style={{
-                        background: 'rgba(127,0,255,0.15)',
-                        border: '1px solid var(--accent-purple)',
-                        color: 'var(--accent-purple)',
-                        fontSize: '0.74rem',
-                        padding: '2px 8px',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.3rem',
-                        fontWeight: 600
-                      }}
-                    >
-                      <Sparkles size={11} />
-                      {generatingFieldIdx === `flag_${i}` ? 'Generating...' : '✨ Generate with AI'}
-                    </button>
-                  </div>
 
-                  {(f.fieldType === 'radio' || f.fieldType === 'dropdown') && f.options ? (
-                    <select
-                      value={userAnswers[i] || ''}
-                      onChange={(e) => handleFlaggedChange(i, e.target.value)}
-                      style={selectStyle}
-                    >
-                      <option value="">— Please select —</option>
-                      {f.options.map((opt, oi) => (
-                        <option key={oi} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  ) : f.fieldType === 'checkbox' && f.options ? (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.3rem' }}>
-                      {f.options.map((opt, oi) => {
-                        const isChecked = Array.isArray(userAnswers[i]) && userAnswers[i].includes(opt);
-                        return (
-                          <label
-                            key={oi}
-                            style={{
-                              display: 'flex', alignItems: 'center', gap: '0.3rem',
-                              padding: '0.35rem 0.7rem', borderRadius: '6px', cursor: 'pointer',
-                              fontSize: '0.84rem', fontWeight: 500,
-                              background: isChecked ? 'rgba(0,230,118,0.15)' : 'rgba(255,255,255,0.04)',
-                              border: isChecked ? '1px solid var(--accent-emerald)' : '1px solid var(--border-color)',
-                              color: isChecked ? 'var(--accent-emerald)' : 'var(--text-muted)',
-                              transition: 'all 0.15s ease'
-                            }}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => handleCheckboxToggle(i, opt)}
-                              style={{ accentColor: 'var(--accent-emerald)' }}
-                            />
-                            {opt}
-                          </label>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <textarea
-                      rows={2}
-                      className="prompt-input"
-                      placeholder={f.reason || 'Enter answer or click ✨ Generate with AI above...'}
-                      value={userAnswers[i] || ''}
-                      onChange={(e) => handleFlaggedChange(i, e.target.value)}
-                      style={{ ...inputStyle, resize: 'vertical' }}
-                    />
-                  )}
-                </div>
-              ))}
+                    {(f.fieldType === 'radio' || f.fieldType === 'dropdown') && f.options ? (
+                      <select
+                        value={userAnswers[key] || ''}
+                        onChange={(e) => handleFlaggedChange(key, e.target.value)}
+                        style={selectStyle}
+                      >
+                        <option value="">— Please select —</option>
+                        {f.options.map((opt, oi) => (
+                          <option key={oi} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    ) : f.fieldType === 'checkbox' && f.options ? (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.3rem' }}>
+                        {f.options.map((opt, oi) => {
+                          const isChecked = Array.isArray(userAnswers[key]) && userAnswers[key].includes(opt);
+                          return (
+                            <label
+                              key={oi}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: '0.3rem',
+                                padding: '0.35rem 0.7rem', borderRadius: '6px', cursor: 'pointer',
+                                fontSize: '0.84rem', fontWeight: 500,
+                                background: isChecked ? 'rgba(0,230,118,0.15)' : 'rgba(255,255,255,0.04)',
+                                border: isChecked ? '1px solid var(--accent-emerald)' : '1px solid var(--border-color)',
+                                color: isChecked ? 'var(--accent-emerald)' : 'var(--text-muted)',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => handleCheckboxToggle(key, opt)}
+                                style={{ accentColor: 'var(--accent-emerald)' }}
+                              />
+                              {opt}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <textarea
+                        rows={2}
+                        className="prompt-input"
+                        placeholder={f.reason || 'Enter answer or click ✨ Generate with AI above...'}
+                        value={userAnswers[key] || ''}
+                        onChange={(e) => handleFlaggedChange(key, e.target.value)}
+                        style={{ ...inputStyle, resize: 'vertical' }}
+                      />
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
