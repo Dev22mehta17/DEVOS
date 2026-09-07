@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: devos-backend
+    runtime: docker
+    rootDir: backend
+    plan: free
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: GEMINI_API_KEY
+        sync: false
