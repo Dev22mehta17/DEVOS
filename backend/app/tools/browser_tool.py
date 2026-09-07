@@ -64,10 +64,11 @@ class BrowserTool:
             except Exception as spawn_err:
                 logger.warning(f"Could not auto-spawn Google Chrome: {spawn_err}")
 
-            # Attempt 3: Standalone Playwright Chromium with stealth flags
+            # Attempt 3: Standalone Playwright Chromium with stealth flags (Headless in cloud/docker, visible on local desktop)
+            is_headless = os.environ.get("HEADLESS", "true").lower() == "true" or not os.environ.get("DISPLAY")
             self.browser = await self.playwright.chromium.launch(
-                headless=False,
-                args=["--disable-blink-features=AutomationControlled", "--no-sandbox"]
+                headless=is_headless,
+                args=["--disable-blink-features=AutomationControlled", "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"]
             )
             self.context = await self.browser.new_context(
                 viewport={"width": 1280, "height": 800},
@@ -75,7 +76,7 @@ class BrowserTool:
             )
             self.page = await self.context.new_page()
             self.is_connected = True
-            logger.info("Launched Playwright Chromium instance with stealth flags.")
+            logger.info(f"Launched Playwright Chromium instance (headless={is_headless}) with stealth flags.")
             return True
 
         except Exception as e:

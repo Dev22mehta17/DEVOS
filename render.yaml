@@ -6,6 +6,8 @@ services:
     plan: free
     envVars:
       - key: PORT
-        value: 8000
+        value: 10000
+      - key: HEADLESS
+        value: "true"
       - key: GEMINI_API_KEY
         sync: false
