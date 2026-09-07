@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Database, User, Briefcase, GraduationCap, Link as LinkIcon, Save, FileUp, Sparkles, FileText, Mail } from 'lucide-react';
+import { API_BASE_URL } from '../config/api';
 
 export default function MemoryManager({ profile, onSave }) {
   const [memoryData, setMemoryData] = useState(profile || {});
@@ -29,7 +30,7 @@ export default function MemoryManager({ profile, onSave }) {
     formData.append('file', file);
 
     try {
-      const res = await fetch('http://localhost:8000/api/memory/upload', {
+      const res = await fetch(`${API_BASE_URL}/api/memory/upload`, {
         method: 'POST',
         body: formData
       });

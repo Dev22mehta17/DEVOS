@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, CheckCircle, AlertTriangle, Send, X, Paperclip, FileUp, Sparkles, RefreshCw, Edit3 } from 'lucide-react';
+import { API_BASE_URL } from '../config/api';
 
 export default function FormReviewModal({ formData, onApprove, onReject }) {
   if (!formData) return null;
@@ -61,7 +62,7 @@ export default function FormReviewModal({ formData, onApprove, onReject }) {
     formDataObj.append('file', file);
 
     try {
-      const res = await fetch('http://localhost:8000/api/memory/upload', {
+      const res = await fetch(`${API_BASE_URL}/api/memory/upload`, {
         method: 'POST',
         body: formDataObj
       });
@@ -103,7 +104,7 @@ export default function FormReviewModal({ formData, onApprove, onReject }) {
   const handleRegenerateAI = async (index, label) => {
     setGeneratingFieldIdx(index);
     try {
-      const res = await fetch('http://localhost:8000/api/generate-answer', {
+      const res = await fetch(`${API_BASE_URL}/api/generate-answer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -125,7 +126,7 @@ export default function FormReviewModal({ formData, onApprove, onReject }) {
   const handleGenerateFlaggedAI = async (key, label) => {
     setGeneratingFieldIdx(`flag_${key}`);
     try {
-      const res = await fetch('http://localhost:8000/api/generate-answer', {
+      const res = await fetch(`${API_BASE_URL}/api/generate-answer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -9,6 +9,7 @@ import ResearchDossierCard from './components/ResearchDossierCard';
 import RecruiterQueueModal from './components/RecruiterQueueModal';
 import CampaignPreviewModal from './components/CampaignPreviewModal';
 import CampaignTrackerCard from './components/CampaignTrackerCard';
+import { API_BASE_URL } from './config/api';
 
 export default function App() {
   const [goal, setGoal] = useState('');
@@ -25,7 +26,7 @@ export default function App() {
 
   // 1. Listen to SSE live step stream
   useEffect(() => {
-    const eventSource = new EventSource('http://localhost:8000/api/stream');
+    const eventSource = new EventSource(`${API_BASE_URL}/api/stream`);
 
     eventSource.onmessage = (e) => {
       try {
@@ -86,7 +87,7 @@ export default function App() {
 
   // 2. Fetch profile memory on load
   useEffect(() => {
-    fetch('http://localhost:8000/api/memory')
+    fetch(`${API_BASE_URL}/api/memory`)
       .then((res) => res.json())
       .then((data) => setProfile(data))
       .catch((err) => console.error('Error loading memory:', err));
@@ -107,7 +108,7 @@ export default function App() {
     ]);
 
     try {
-      const res = await fetch('http://localhost:8000/api/execute', {
+      const res = await fetch(`${API_BASE_URL}/api/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ goal: targetGoal }),
@@ -122,7 +123,7 @@ export default function App() {
 
   const handleApproveAction = async (actionId, approvalPayload) => {
     try {
-      await fetch('http://localhost:8000/api/approve', {
+      await fetch(`${API_BASE_URL}/api/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action_id: actionId, payload: approvalPayload }),
@@ -137,7 +138,7 @@ export default function App() {
 
   const handleRejectAction = async (actionId) => {
     try {
-      await fetch('http://localhost:8000/api/reject', {
+      await fetch(`${API_BASE_URL}/api/reject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action_id: actionId }),
@@ -152,7 +153,7 @@ export default function App() {
 
   const handleCancelCampaign = async (campaignId) => {
     try {
-      await fetch(`http://localhost:8000/api/campaign/cancel/${campaignId}`, {
+      await fetch(`${API_BASE_URL}/api/campaign/cancel/${campaignId}`, {
         method: 'POST',
       });
       setCampaignTracker((prev) => prev ? { ...prev, status: 'CANCELLED' } : null);
@@ -163,7 +164,7 @@ export default function App() {
 
   const handleSaveMemory = async (updatedData) => {
     try {
-      const res = await fetch('http://localhost:8000/api/memory', {
+      const res = await fetch(`${API_BASE_URL}/api/memory`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedData),

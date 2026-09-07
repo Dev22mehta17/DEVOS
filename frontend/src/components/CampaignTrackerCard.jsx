@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Send, Clock, CheckCircle2, AlertCircle, RefreshCw, XCircle, ChevronDown, ChevronUp, Mail } from 'lucide-react';
+import { API_BASE_URL } from '../config/api';
 
 export default function CampaignTrackerCard({ campaignStatus, onCancel, onClose }) {
   if (!campaignStatus) return null;
@@ -28,7 +29,7 @@ export default function CampaignTrackerCard({ campaignStatus, onCancel, onClose 
     if (status === 'COMPLETED' || status === 'CANCELLED') return;
 
     const interval = setInterval(() => {
-      fetch(`http://localhost:8000/api/campaign/status/${campaign_id}`)
+      fetch(`${API_BASE_URL}/api/campaign/status/${campaign_id}`)
         .then((res) => res.json())
         .then((data) => {
           if (data && data.campaign_id) {
