@@ -31,17 +31,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# In-memory stream message queue for SSE broadcasts
-stream_queue: asyncio.Queue = asyncio.Queue()
+# Multi-subscriber SSE queue set for all connected clients
+active_subscribers = set()
 
 async def push_stream_event(step_type: str, message: str, details: Dict[str, Any] = None):
-    """Pushes a live thinking/action log to the frontend SSE stream."""
+    """Pushes a live thinking/action log to all active frontend SSE streams."""
     event = {
         "step_type": step_type,
         "message": message,
         "details": details or {}
     }
-    await stream_queue.put(event)
+    for q in list(active_subscribers):
+        try:
+            q.put_nowait(event)
+        except Exception:
+            pass
 
 class GoalRequest(BaseModel):
     goal: str
@@ -83,15 +87,21 @@ async def health_check():
 @app.get("/api/stream")
 async def stream_logs(request: Request):
     """Server-Sent Events endpoint streaming live agent step updates to the React UI."""
+    client_queue = asyncio.Queue()
+    active_subscribers.add(client_queue)
+
     async def event_generator():
-        while True:
-            if await request.is_disconnected():
-                break
-            try:
-                event = await asyncio.wait_for(stream_queue.get(), timeout=1.0)
-                yield {"data": json.dumps(event)}
-            except asyncio.TimeoutError:
-                yield {"data": json.dumps({"step_type": "HEARTBEAT", "message": "ping"})}
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    event = await asyncio.wait_for(client_queue.get(), timeout=1.0)
+                    yield {"data": json.dumps(event)}
+                except asyncio.TimeoutError:
+                    yield {"data": json.dumps({"step_type": "HEARTBEAT", "message": "ping"})}
+        finally:
+            active_subscribers.discard(client_queue)
 
     return EventSourceResponse(event_generator())
 
@@ -137,8 +147,9 @@ async def generate_custom_answer(req: GenerateAnswerRequest):
 
 @app.post("/api/execute")
 async def execute_goal(req: GoalRequest):
-    """Executes goal through the autonomous Agent Core with planning, verifiers, and telemetry."""
-    return await agent_executor.execute_goal(req.goal)
+    """Executes goal asynchronously through the autonomous Agent Core with live telemetry."""
+    asyncio.create_task(agent_executor.execute_goal(req.goal))
+    return {"status": "ACCEPTED", "goal": req.goal}
 
 @app.post("/api/approve")
 async def approve_action(req: ActionApprovalRequest):
