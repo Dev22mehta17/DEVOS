@@ -20,21 +20,67 @@ class LinkedInEasyApplyAdapter:
         logger.info(f"[LinkedInAdapter] Opening LinkedIn job: {job_url}")
 
         nav_res = await browser_tool.navigate(job_url)
-        await asyncio.sleep(3.0)
+        await asyncio.sleep(4.0)
 
         page = await browser_tool.get_active_page()
         if not page:
             return {"status": "ERROR", "message": "Browser page unavailable"}
 
+        # Scroll down to ensure the job detail card loads fully
+        await page.evaluate("window.scrollTo(0, 300)")
+        await asyncio.sleep(1.5)
+
         page_title = await page.title()
 
-        # Step 1: Detect Easy Apply Button
-        easy_apply_btn = await page.query_selector(
-            'button.jobs-apply-button, button[aria-label*="Easy Apply"], button:has-text("Easy Apply")'
-        )
+        # Step 1: Detect Easy Apply Button — multiple strategies with retry
+        EASY_APPLY_SELECTORS = [
+            'button.jobs-apply-button',
+            'button.jobs-apply-button--top-card',
+            'div.jobs-apply-button--top-card button',
+            'button[aria-label*="Easy Apply"]',
+            'button[aria-label*="easy apply"]',
+            '.jobs-s-apply button',
+            '.jobs-apply-button--top-card',
+            'button.artdeco-button--primary:has-text("Easy Apply")',
+            'button:has-text("Easy Apply")',
+        ]
+
+        easy_apply_btn = None
+        for attempt in range(3):
+            for selector in EASY_APPLY_SELECTORS:
+                try:
+                    btn = await page.query_selector(selector)
+                    if btn and await btn.is_visible():
+                        easy_apply_btn = btn
+                        logger.info(f"[LinkedInAdapter] Found Easy Apply button with selector: {selector}")
+                        break
+                except Exception:
+                    continue
+            if easy_apply_btn:
+                break
+            # If not found, scroll more and wait for lazy load
+            logger.debug(f"[LinkedInAdapter] Easy Apply button not found on attempt {attempt+1}, scrolling and retrying...")
+            await page.evaluate("window.scrollTo(0, document.body.scrollHeight / 3)")
+            await asyncio.sleep(2.0)
+
+        # Final fallback: search all buttons by text content
+        if not easy_apply_btn:
+            try:
+                easy_apply_btn = await page.evaluate_handle("""() => {
+                    const buttons = Array.from(document.querySelectorAll('button'));
+                    return buttons.find(b => b.innerText && b.innerText.trim().toLowerCase().includes('easy apply')) || null;
+                }""")
+                # Check if the handle is actually a valid element
+                is_valid = await page.evaluate("(el) => el !== null && el.tagName === 'BUTTON'", easy_apply_btn)
+                if not is_valid:
+                    easy_apply_btn = None
+                else:
+                    logger.info("[LinkedInAdapter] Found Easy Apply button via JS text search fallback.")
+            except Exception:
+                easy_apply_btn = None
 
         if not easy_apply_btn:
-            logger.warning("[LinkedInAdapter] No 'Easy Apply' button found on this job post.")
+            logger.warning("[LinkedInAdapter] No 'Easy Apply' button found on this job post after exhaustive search.")
             return {
                 "status": "NOT_EASY_APPLY",
                 "message": "This job does not have LinkedIn Easy Apply (it may redirect to an external company website).",
@@ -132,29 +178,76 @@ class LinkedInEasyApplyAdapter:
             try:
                 radios = await page.query_selector_all('fieldset')
                 for fs in radios:
+                    if not await fs.is_visible():
+                        continue
                     legend = await page.evaluate("""(el) => {
-                        const leg = el.querySelector('legend, span.fb-form-element-label');
+                        const leg = el.querySelector('legend, span.fb-form-element-label, span[aria-hidden="true"]');
                         return leg ? leg.innerText.trim().toLowerCase() : '';
                     }""", fs)
                     
+                    if not legend:
+                        continue
+
                     target_choice = "yes"
-                    if any(k in legend for k in ["sponsorship", "visa", "require sponsorship", "criminal"]):
+                    if any(k in legend for k in ["sponsorship", "visa", "require sponsorship", "criminal", "drug test"]):
                         target_choice = "no"
-                    elif any(k in legend for k in ["authorized to work", "legally authorized", "bachelor", "degree", "graduat"]):
+                    elif any(k in legend for k in ["authorized to work", "legally authorized", "bachelor", "degree", "graduat",
+                                                     "willing to relocate", "commute", "comfortable", "available"]):
                         target_choice = "yes"
 
-                    # Select target radio
+                    # Select target radio — click the label AND the input
                     await page.evaluate("""({fs, target}) => {
-                        const labels = Array.from(fs.querySelectorAll('label, input[type="radio"]'));
+                        const labels = Array.from(fs.querySelectorAll('label'));
                         for (let l of labels) {
                             if (l.innerText && l.innerText.trim().toLowerCase() === target) {
+                                const inp = l.querySelector('input[type="radio"]') || document.getElementById(l.getAttribute('for'));
+                                if (inp) {
+                                    inp.checked = true;
+                                    inp.dispatchEvent(new Event('change', {bubbles: true}));
+                                    inp.dispatchEvent(new Event('input', {bubbles: true}));
+                                }
                                 l.click();
                                 break;
                             }
                         }
                     }""", {"fs": fs, "target": target_choice})
+                    filled_fields.append({
+                        "field_label": legend.title(),
+                        "value": target_choice,
+                        "fieldType": "radio",
+                        "is_auto_matched": True
+                    })
             except Exception as r_err:
                 logger.debug(f"[LinkedInAdapter] Radio answer ignored: {r_err}")
+
+            # 3. Dropdown selects (Country code, City, etc.)
+            try:
+                selects = await page.query_selector_all('select')
+                for sel in selects:
+                    if not await sel.is_visible():
+                        continue
+                    sel_label = await page.evaluate("""(el) => {
+                        const formGroup = el.closest('.fb-form-element, .jobs-easy-apply-form-element, div');
+                        const label = formGroup ? formGroup.querySelector('label, span') : null;
+                        return label ? label.innerText.trim().toLowerCase() : '';
+                    }""", sel)
+
+                    if any(k in sel_label for k in ["country", "phone country"]):
+                        # Select India (+91)
+                        await page.evaluate("""(el) => {
+                            const opts = Array.from(el.options);
+                            const india = opts.find(o => o.text.includes('India') || o.value.includes('IN') || o.text.includes('+91'));
+                            if (india) { el.value = india.value; el.dispatchEvent(new Event('change', {bubbles: true})); }
+                        }""", sel)
+                    elif any(k in sel_label for k in ["city", "location"]):
+                        # Try to select Chandigarh/Delhi/NCR
+                        await page.evaluate("""(el) => {
+                            const opts = Array.from(el.options);
+                            const match = opts.find(o => ['chandigarh', 'delhi', 'ncr', 'gurgaon', 'noida'].some(c => o.text.toLowerCase().includes(c)));
+                            if (match) { el.value = match.value; el.dispatchEvent(new Event('change', {bubbles: true})); }
+                        }""", sel)
+            except Exception as s_err:
+                logger.debug(f"[LinkedInAdapter] Select/dropdown fill ignored: {s_err}")
 
             # Click "Next" or "Review" button to proceed to next step
             next_btn = await page.query_selector(
