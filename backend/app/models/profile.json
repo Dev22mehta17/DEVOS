@@ -4,7 +4,11 @@
     "email_primary": "mehtadev2004@gmail.com",
     "email_secondary": "dev.work@example.com",
     "phone": "+91-7206049507",
-    "location": "Punjab, India",
+    "location": "Bhiwani, Haryana",
+    "address": "Bhiwani, Haryana",
+    "city": "Bhiwani",
+    "state": "Haryana",
+    "native_place": "Bhiwani, Haryana",
     "work_authorization": "Authorized to work in India & US Remote",
     "gender": "Male"
   },
@@ -69,7 +73,8 @@
       "amazon": "Deep appreciation for Amazon's Leadership Principles, Customer Obsession, and building high-scale distributed backend services.",
       "google": "Drawn to Google's engineering excellence, distributed database architectures, and bleeding-edge AI agent frameworks."
     },
-    "custom_user_notes": "\nMy native place and where i am currently residing is Bhiwani, Haryana\n\nI am actively looking for SDE-1 / Software Engineer roles with high ownership and challenging distributed systems problems."
+    "custom_user_notes": "\nMy native place and where i am currently residing is Bhiwani, Haryana\n\nI am actively looking for SDE-1 / Software Engineer roles with high ownership and challenging distributed systems problems.",
+    "form_overrides": "Current location and native place: Bhiwani, Haryana"
   },
   "triage_settings": {
     "keywords": [

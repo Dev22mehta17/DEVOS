@@ -228,10 +228,52 @@ Custom Notes: {extra.get('custom_user_notes', '')}
             logger.error(f"Error querying semantic memory: {e}")
             return []
 
+    def _check_custom_overrides(self, field_lower: str) -> Optional[str]:
+        """Check custom_user_notes, form_overrides, and extra_info for direct answers."""
+        extra = self.profile_data.get("extra_context", {})
+        overrides_text = f"{extra.get('form_overrides', '')}\n{extra.get('custom_user_notes', '')}\n{self.profile_data.get('extra_info', '')}"
+        if not overrides_text.strip():
+            return None
+        
+        # 1. Location / Address / Native Place / Hometown / Residing detection from free-form text
+        if any(k in field_lower for k in ["native", "residing", "reside", "live", "hometown", "location", "address", "city", "stay", "home town", "where do you", "current address", "permanent address"]):
+            # If user mentioned Bhiwani or Haryana in custom notes / overrides
+            if "bhiwani" in overrides_text.lower():
+                if "haryana" in overrides_text.lower():
+                    if "city" in field_lower and not any(k in field_lower for k in ["address", "location", "state"]):
+                        return "Bhiwani"
+                    if "state" in field_lower and not any(k in field_lower for k in ["address", "location", "city"]):
+                        return "Haryana"
+                    return "Bhiwani, Haryana"
+                return "Bhiwani"
+
+        # 2. Key-Value syntax in overrides box (e.g. "Notice: Immediate", "City: Bhiwani", "Location: Bhiwani, Haryana")
+        for line in overrides_text.splitlines():
+            line = line.strip()
+            if ":" in line:
+                parts = line.split(":", 1)
+                key = parts[0].strip().lower()
+                val = parts[1].strip()
+                if key and val and (key in field_lower or field_lower in key):
+                    return val
+            elif "=" in line:
+                parts = line.split("=", 1)
+                key = parts[0].strip().lower()
+                val = parts[1].strip()
+                if key and val and (key in field_lower or field_lower in key):
+                    return val
+
+        return None
+
     def get_field_value(self, field_name: str) -> Optional[str]:
         """Maps standard form field keys to memory profile entries."""
         field_lower = field_name.lower().replace("_", " ").replace("-", " ")
         
+        # 0. Check High-Priority Custom Overrides / Extra Info first!
+        custom_val = self._check_custom_overrides(field_lower)
+        if custom_val:
+            return custom_val
+
         # 1. Offer in Hand / Other Offers (Specific check before general CTC/salary)
         if any(k in field_lower for k in ["offer in hand", "any offer", "holding offer", "holding any offer", "other offer", "competing offer", "current offer"]):
             return "No offer in hand / Currently interviewing"
@@ -255,6 +297,10 @@ Custom Notes: {extra.get('custom_user_notes', '')}
         if "graduation" in field_lower and not any(k in field_lower for k in ["cgpa", "gpa", "percent", "mark"]):
             return self.profile_data.get("education", {}).get("graduation_year", "2026")
 
+        # College / University Location specific check
+        if any(k in field_lower for k in ["college location", "university location", "institute location", "campus location"]):
+            return "Patiala, Punjab"
+
         # College / University / Institute Name (Specific check before candidate name!)
         if any(k in field_lower for k in ["college", "university", "institution", "institute", "alma mater"]):
             return self.profile_data.get("education", {}).get("university")
@@ -265,13 +311,30 @@ Custom Notes: {extra.get('custom_user_notes', '')}
         if any(k in field_lower for k in ["company name", "current employer", "organization name", "current company", "firm name", "employer"]):
             return self.profile_data.get("professional", {}).get("current_company")
 
-        # 4. Personal Contact & Candidate Name
+        # 4. Personal Contact, Location & Candidate Name
         if "email" in field_lower:
             return self.profile_data.get("personal", {}).get("email_primary")
         if any(k in field_lower for k in ["phone", "mobile", "contact", "whatsapp", "cell"]):
             return self.profile_data.get("personal", {}).get("phone")
-        if any(k in field_lower for k in ["location", "address", "city", "state", "current location"]):
-            return self.profile_data.get("personal", {}).get("location")
+
+        # Location, Address, City, State, Native Place, Hometown, Residence
+        if any(k in field_lower for k in [
+            "location", "address", "city", "state", "current location", "current address",
+            "permanent address", "native", "native place", "hometown", "residing", "residence",
+            "where do you live", "where do you reside", "where are you located", "current city",
+            "base location", "present address", "home town", "place of stay"
+        ]):
+            if "city" in field_lower and not any(k in field_lower for k in ["address", "location", "state", "place"]):
+                return self.profile_data.get("personal", {}).get("city") or "Bhiwani"
+            if "state" in field_lower and not any(k in field_lower for k in ["address", "location", "city"]):
+                return self.profile_data.get("personal", {}).get("state") or "Haryana"
+            
+            return (
+                self.profile_data.get("personal", {}).get("location") or
+                self.profile_data.get("personal", {}).get("address") or
+                "Bhiwani, Haryana"
+            )
+
         if "gender" in field_lower:
             return self.profile_data.get("personal", {}).get("gender")
 

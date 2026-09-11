@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Database, User, Briefcase, GraduationCap, Link as LinkIcon, Save, FileUp, Sparkles, FileText, Mail } from 'lucide-react';
+import { Database, User, Briefcase, GraduationCap, Link as LinkIcon, Save, FileUp, Sparkles, FileText, Mail, MapPin } from 'lucide-react';
 import { API_BASE_URL } from '../config/api';
 
 export default function MemoryManager({ profile, onSave }) {
@@ -101,11 +101,35 @@ export default function MemoryManager({ profile, onSave }) {
           />
           <input
             className="prompt-input"
-            style={{ width: '100%' }}
+            style={{ width: '100%', marginBottom: '0.35rem' }}
             value={memoryData.personal?.phone || ''}
             onChange={(e) => handleChange('personal', 'phone', e.target.value)}
             placeholder="Phone Number (e.g. +91-7206049507)"
           />
+          <input
+            className="prompt-input"
+            style={{ width: '100%', marginBottom: '0.35rem' }}
+            value={memoryData.personal?.location || ''}
+            onChange={(e) => {
+              handleChange('personal', 'location', e.target.value);
+              handleChange('personal', 'address', e.target.value);
+            }}
+            placeholder="Current Location / Address (e.g. Bhiwani, Haryana)"
+          />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.35rem' }}>
+            <input
+              className="prompt-input"
+              value={memoryData.personal?.city || ''}
+              onChange={(e) => handleChange('personal', 'city', e.target.value)}
+              placeholder="City (e.g. Bhiwani)"
+            />
+            <input
+              className="prompt-input"
+              value={memoryData.personal?.state || ''}
+              onChange={(e) => handleChange('personal', 'state', e.target.value)}
+              placeholder="State (e.g. Haryana)"
+            />
+          </div>
         </div>
 
         {/* Education & Experience */}
@@ -241,6 +265,26 @@ export default function MemoryManager({ profile, onSave }) {
           />
           <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
             Separate search keywords with commas. DevOS queries Gmail with these terms.
+          </div>
+        </div>
+
+        {/* Extra Info & Form Overrides (High Priority) */}
+        <div style={{ background: 'rgba(0, 230, 153, 0.05)', border: '1px solid rgba(0, 230, 153, 0.3)', borderRadius: '8px', padding: '0.75rem' }}>
+          <div style={{ color: 'var(--accent-emerald)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.35rem' }}>
+            <Sparkles size={15} /> Extra Info & Form Overrides (High Priority)
+          </div>
+          <textarea
+            className="prompt-input"
+            rows={3}
+            style={{ width: '100%', resize: 'vertical', fontSize: '0.84rem', lineHeight: 1.4 }}
+            value={memoryData.extra_context?.form_overrides || ''}
+            onChange={(e) => {
+              handleChange('extra_context', 'form_overrides', e.target.value);
+            }}
+            placeholder="e.g. My native place and where I am currently residing is Bhiwani, Haryana. Location is Bhiwani, Haryana."
+          />
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.3rem', lineHeight: 1.3 }}>
+            💡 DevOS checks this box first before standard memory for native place, address, city, and custom rules.
           </div>
         </div>
 
