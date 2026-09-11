@@ -12,11 +12,11 @@
     "university": "Thapar Institute of Engineering and Technology, Patiala",
     "degree": "B.E. Computer Engineering",
     "graduation_year": "2026",
-    "gpa": "8.7",
-    "cgpa": "8.7",
+    "gpa": "8.7 ",
+    "cgpa": "8.7 ",
     "graduation_cgpa": "8.7",
-    "tenth_percentage": "93.8",
-    "twelfth_percentage": "93.6",
+    "tenth_percentage": "93.8 ",
+    "twelfth_percentage": "93.6 ",
     "coursework": [
       "Data Structures",
       "Algorithms",
@@ -69,7 +69,7 @@
       "amazon": "Deep appreciation for Amazon's Leadership Principles, Customer Obsession, and building high-scale distributed backend services.",
       "google": "Drawn to Google's engineering excellence, distributed database architectures, and bleeding-edge AI agent frameworks."
     },
-    "custom_user_notes": "I am actively looking for SDE-1 / Software Engineer roles with high ownership and challenging distributed systems problems."
+    "custom_user_notes": "\nMy native place and where i am currently residing is Bhiwani, Haryana\n\nI am actively looking for SDE-1 / Software Engineer roles with high ownership and challenging distributed systems problems."
   },
   "triage_settings": {
     "keywords": [

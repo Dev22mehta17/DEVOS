@@ -24,65 +24,64 @@ export default function App() {
   const [campaignTracker, setCampaignTracker] = useState(null);
   const [profile, setProfile] = useState({});
 
-  // 1. Listen to SSE live step stream
+  // 1. Stream events via polling (reliable through Cloudflare tunnels)
   useEffect(() => {
-    const eventSource = new EventSource(`${API_BASE_URL}/api/stream`);
+    let pollSinceId = 0;
+    let active = true;
 
-    eventSource.onmessage = (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        if (data.step_type === 'HEARTBEAT') return;
+    const processEvent = (data) => {
+      if (data.step_type === 'HEARTBEAT') return;
 
-        setLogs((prev) => [...prev, data]);
+      setLogs((prev) => [...prev, data]);
 
-        if (data.step_type === 'CAMPAIGN_PREVIEW') {
-          if (data.details) {
-            setCampaignPreview(data.details);
-          }
-          setIsProcessing(false);
-        } else if (data.step_type === 'CAMPAIGN_PROGRESS') {
-          if (data.details) {
-            setCampaignTracker(data.details);
-          }
-        } else if (data.step_type === 'RESEARCH_DOSSIER') {
-          if (data.details) {
-            setDossierResult(data.details);
-          }
-          setIsProcessing(false);
-        } else if (data.step_type === 'RECRUITER_QUEUE') {
-          if (data.details) {
-            setRecruiterQueue(data.details);
-          }
-          setIsProcessing(false);
-        } else if (data.step_type === 'SEARCH_RESULT') {
-          if (data.details) {
-            setSearchResult(data.details);
-          }
-        } else if (data.step_type === 'APPROVAL_REQUIRED') {
-          if (data.details && data.details.recipient) {
-            setPendingEmail(data.details);
-          } else if (data.details && data.details.filled_fields) {
-            setPendingForm(data.details);
-          }
-          setIsProcessing(false);
-        } else if (data.step_type === 'COMPLETED') {
-          setIsProcessing(false);
-          if (data.details && (data.details.direct_answer || data.details.sources)) {
-            setSearchResult(data.details);
-          } else if (data.details && data.details.comparison_matrix) {
-            setDossierResult(data.details);
-          }
+      if (data.step_type === 'CAMPAIGN_PREVIEW') {
+        if (data.details) setCampaignPreview(data.details);
+        setIsProcessing(false);
+      } else if (data.step_type === 'CAMPAIGN_PROGRESS') {
+        if (data.details) setCampaignTracker(data.details);
+      } else if (data.step_type === 'RESEARCH_DOSSIER') {
+        if (data.details) setDossierResult(data.details);
+        setIsProcessing(false);
+      } else if (data.step_type === 'RECRUITER_QUEUE') {
+        if (data.details) setRecruiterQueue(data.details);
+        setIsProcessing(false);
+      } else if (data.step_type === 'SEARCH_RESULT') {
+        if (data.details) setSearchResult(data.details);
+      } else if (data.step_type === 'APPROVAL_REQUIRED') {
+        if (data.details && data.details.recipient) {
+          setPendingEmail(data.details);
+        } else if (data.details && data.details.filled_fields) {
+          setPendingForm(data.details);
         }
-      } catch (err) {
-        console.error('Error parsing SSE event:', err);
+        setIsProcessing(false);
+      } else if (data.step_type === 'COMPLETED') {
+        setIsProcessing(false);
+        if (data.details && (data.details.direct_answer || data.details.sources)) {
+          setSearchResult(data.details);
+        } else if (data.details && data.details.comparison_matrix) {
+          setDossierResult(data.details);
+        }
       }
     };
 
-    eventSource.onerror = (err) => {
-      console.error('SSE Error:', err);
+    const pollStream = async () => {
+      while (active) {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/stream/poll?since=${pollSinceId}`);
+          const result = await res.json();
+          if (result.events && result.events.length > 0) {
+            result.events.forEach(processEvent);
+            pollSinceId = result.latest_id;
+          }
+        } catch (err) {
+          // Silently retry on network errors
+        }
+        await new Promise(r => setTimeout(r, 1000));
+      }
     };
 
-    return () => eventSource.close();
+    pollStream();
+    return () => { active = false; };
   }, []);
 
   // 2. Fetch profile memory on load

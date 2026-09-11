@@ -34,18 +34,29 @@ app.add_middleware(
 # Multi-subscriber SSE queue set for all connected clients
 active_subscribers = set()
 
+# Polling buffer: stores recent events with sequential IDs for poll-based clients
+stream_events_buffer: list = []
+stream_event_counter = 0
+
 async def push_stream_event(step_type: str, message: str, details: Dict[str, Any] = None):
-    """Pushes a live thinking/action log to all active frontend SSE streams."""
+    """Pushes a live thinking/action log to all active frontend SSE streams and polling buffer."""
+    global stream_event_counter
     event = {
         "step_type": step_type,
         "message": message,
         "details": details or {}
     }
+    # SSE subscribers
     for q in list(active_subscribers):
         try:
             q.put_nowait(event)
         except Exception:
             pass
+    # Polling buffer (capped at 200)
+    stream_event_counter += 1
+    stream_events_buffer.append({"id": stream_event_counter, **event})
+    if len(stream_events_buffer) > 200:
+        stream_events_buffer.pop(0)
 
 class GoalRequest(BaseModel):
     goal: str
@@ -111,6 +122,13 @@ async def stream_logs(request: Request):
             "Connection": "keep-alive",
         }
     )
+
+@app.get("/api/stream/poll")
+async def poll_stream(since: int = 0):
+    """Polling fallback for SSE — returns all events since the given ID.
+    Frontend polls this every 1s when SSE doesn't work (e.g. through Cloudflare tunnels)."""
+    events = [e for e in stream_events_buffer if e["id"] > since]
+    return {"events": events, "latest_id": stream_event_counter}
 
 @app.get("/api/memory")
 async def get_profile_memory():
