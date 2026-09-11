@@ -390,7 +390,7 @@ class BrowserTool:
         if not self.page:
             return False
         try:
-            success = await self.page.evaluate("""([idx, nameStr, valStr, labelStr, qIdx]) => {
+            success = await self.page.evaluate(r"""([idx, nameStr, valStr, labelStr, qIdx]) => {
                 const cleanStr = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
                 const targetLabel = cleanStr(labelStr);
                 const targetWords = targetLabel.split(' ').filter(w => w.length > 1);
