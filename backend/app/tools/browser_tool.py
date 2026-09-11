@@ -99,9 +99,13 @@ class BrowserTool:
             if self.page and not self.page.is_closed():
                 return self.page
 
-            # 2. Check existing open pages in context
+            # 2. Check existing open pages in context (prefer non-blank tabs)
             if self.context:
                 pages = self.context.pages
+                non_blank = [p for p in pages if not p.is_closed() and p.url and p.url != "about:blank"]
+                if non_blank:
+                    self.page = non_blank[-1]
+                    return self.page
                 for p in pages:
                     if not p.is_closed():
                         self.page = p

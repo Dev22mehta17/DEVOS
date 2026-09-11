@@ -17,32 +17,45 @@ class LinkedInEasyApplyAdapter:
     @staticmethod
     async def apply_to_job(job_url: str, goal_description: str = "") -> Dict[str, Any]:
         action_id = f"linkedin_{uuid.uuid4().hex[:8]}"
-        logger.info(f"[LinkedInAdapter] Opening LinkedIn job: {job_url}")
+        # Normalize search-results or collection URLs to clean direct view URL
+        import re
+        job_id_match = re.search(r'currentJobId=(\d+)', job_url) or re.search(r'/jobs/view/(\d+)', job_url)
+        job_id = job_id_match.group(1) if job_id_match else None
+        target_url = job_url
+        if job_id and "search-results" in job_url:
+            target_url = f"https://www.linkedin.com/jobs/view/{job_id}/"
+            logger.info(f"[LinkedInAdapter] Normalized search URL to direct view: {target_url}")
 
-        nav_res = await browser_tool.navigate(job_url)
+        logger.info(f"[LinkedInAdapter] Opening LinkedIn job: {target_url}")
+        nav_res = await browser_tool.navigate(target_url)
         await asyncio.sleep(4.0)
 
         page = await browser_tool.get_active_page()
         if not page:
             return {"status": "ERROR", "message": "Browser page unavailable"}
 
-        # Scroll down to ensure the job detail card loads fully
+        # Scroll to ensure the job details load fully
         await page.evaluate("window.scrollTo(0, 300)")
         await asyncio.sleep(1.5)
 
         page_title = await page.title()
 
-        # Step 1: Detect Easy Apply Button — multiple strategies with retry
+        # Step 1: Detect Easy Apply Button — checking both <button> and <a> elements
         EASY_APPLY_SELECTORS = [
+            'a[href*="/apply/"]',
             'button.jobs-apply-button',
             'button.jobs-apply-button--top-card',
             'div.jobs-apply-button--top-card button',
+            'div.jobs-apply-button--top-card a',
+            'a[aria-label*="Easy Apply"]',
             'button[aria-label*="Easy Apply"]',
+            'a[aria-label*="easy apply"]',
             'button[aria-label*="easy apply"]',
             '.jobs-s-apply button',
+            '.jobs-s-apply a',
             '.jobs-apply-button--top-card',
-            'button.artdeco-button--primary:has-text("Easy Apply")',
             'button:has-text("Easy Apply")',
+            'a:has-text("Easy Apply")',
         ]
 
         easy_apply_btn = None
@@ -52,32 +65,58 @@ class LinkedInEasyApplyAdapter:
                     btn = await page.query_selector(selector)
                     if btn and await btn.is_visible():
                         easy_apply_btn = btn
-                        logger.info(f"[LinkedInAdapter] Found Easy Apply button with selector: {selector}")
+                        logger.info(f"[LinkedInAdapter] Found Easy Apply element with selector: {selector}")
                         break
                 except Exception:
                     continue
             if easy_apply_btn:
                 break
-            # If not found, scroll more and wait for lazy load
-            logger.debug(f"[LinkedInAdapter] Easy Apply button not found on attempt {attempt+1}, scrolling and retrying...")
-            await page.evaluate("window.scrollTo(0, document.body.scrollHeight / 3)")
+            # If not found, wait and scroll
+            logger.debug(f"[LinkedInAdapter] Easy Apply element not found on attempt {attempt+1}, retrying...")
             await asyncio.sleep(2.0)
 
-        # Final fallback: search all buttons by text content
+        # Fallback: search all clickable elements for Easy Apply text or aria-label
         if not easy_apply_btn:
             try:
-                easy_apply_btn = await page.evaluate_handle("""() => {
-                    const buttons = Array.from(document.querySelectorAll('button'));
-                    return buttons.find(b => b.innerText && b.innerText.trim().toLowerCase().includes('easy apply')) || null;
+                trigger_info = await page.evaluate(r"""() => {
+                    const clickable = Array.from(document.querySelectorAll('a, button, div[role="button"]'));
+                    const match = clickable.find(el => {
+                        const aria = (el.getAttribute('aria-label') || '').toLowerCase();
+                        const txt = (el.innerText || '').trim().toLowerCase();
+                        const href = (el.getAttribute('href') || '').toLowerCase();
+                        return aria.includes('easy apply') || txt === 'easy apply' || (txt.includes('easy apply') && el.tagName === 'BUTTON') || href.includes('/apply/');
+                    });
+                    if (match) {
+                        return { tag: match.tagName, href: match.href || '', aria: match.getAttribute('aria-label') || '' };
+                    }
+                    return null;
                 }""")
-                # Check if the handle is actually a valid element
-                is_valid = await page.evaluate("(el) => el !== null && el.tagName === 'BUTTON'", easy_apply_btn)
-                if not is_valid:
-                    easy_apply_btn = None
-                else:
-                    logger.info("[LinkedInAdapter] Found Easy Apply button via JS text search fallback.")
-            except Exception:
-                easy_apply_btn = None
+                if trigger_info:
+                    logger.info(f"[LinkedInAdapter] Detected Easy Apply trigger via JS fallback: {trigger_info}")
+                    if trigger_info.get("href") and "/apply/" in trigger_info["href"]:
+                        logger.info(f"[LinkedInAdapter] Navigating directly to apply flow URL: {trigger_info['href']}")
+                        await page.goto(trigger_info["href"], wait_until="domcontentloaded")
+                        await asyncio.sleep(3.5)
+                        easy_apply_btn = "NAVIGATED"
+                    else:
+                        easy_apply_btn = await page.query_selector('a[aria-label*="Easy Apply"], button[aria-label*="Easy Apply"], a:has-text("Easy Apply"), button:has-text("Easy Apply")')
+            except Exception as e:
+                logger.debug(f"[LinkedInAdapter] JS fallback error: {e}")
+
+        # If still not found but we have a valid jobId, attempt direct SDUI apply flow navigation
+        if not easy_apply_btn and job_id:
+            sdui_url = f"https://www.linkedin.com/jobs/view/{job_id}/apply/?openSDUIApplyFlow=true"
+            logger.info(f"[LinkedInAdapter] Attempting direct SDUI apply flow navigation: {sdui_url}")
+            try:
+                await page.goto(sdui_url, wait_until="domcontentloaded")
+                await asyncio.sleep(3.5)
+                # Verify if modal or application inputs appeared
+                has_modal = await page.evaluate("() => document.querySelectorAll('input, select, .jobs-easy-apply-modal, button[aria-label*=\"Continue\"]').length > 0")
+                if has_modal:
+                    logger.info("[LinkedInAdapter] ✅ Direct SDUI apply flow opened successfully!")
+                    easy_apply_btn = "NAVIGATED"
+            except Exception as sdui_err:
+                logger.warning(f"[LinkedInAdapter] SDUI navigation failed: {sdui_err}")
 
         if not easy_apply_btn:
             logger.warning("[LinkedInAdapter] No 'Easy Apply' button found on this job post after exhaustive search.")
@@ -87,10 +126,25 @@ class LinkedInEasyApplyAdapter:
                 "page_title": page_title
             }
 
-        # Step 2: Click Easy Apply to open modal
-        logger.info("[LinkedInAdapter] Clicking Easy Apply button...")
-        await easy_apply_btn.click()
-        await asyncio.sleep(2.0)
+        # Step 2: Open Easy Apply flow
+        if easy_apply_btn and easy_apply_btn != "NAVIGATED":
+            logger.info("[LinkedInAdapter] Clicking Easy Apply button...")
+            try:
+                href = await easy_apply_btn.get_attribute("href")
+                if href and "/apply/" in href:
+                    logger.info(f"[LinkedInAdapter] Direct apply href detected: {href}, navigating...")
+                    await page.goto(href, wait_until="domcontentloaded")
+                    await asyncio.sleep(3.5)
+                else:
+                    await easy_apply_btn.click()
+                    await asyncio.sleep(2.5)
+            except Exception as click_err:
+                logger.warning(f"[LinkedInAdapter] Standard click failed: {click_err}. Retrying via evaluate...")
+                await page.evaluate("""() => {
+                    const el = document.querySelector('button.jobs-apply-button, a[aria-label*="Easy Apply"], button[aria-label*="Easy Apply"], a[href*="/apply/"]');
+                    if (el) el.click();
+                }""")
+                await asyncio.sleep(2.5)
 
         # Step 3: Candidate Data from Memory
         p = memory_engine.profile_data
