@@ -498,13 +498,14 @@ class BrowserTool:
         if not self.page or not option_text:
             return False
         try:
-            success = await self.page.evaluate("""([qIdx, optText, qLabel]) => {
-                const optClean = (optText || '').toLowerCase().trim();
+            success = await self.page.evaluate(r"""([qIdx, optText, qLabel]) => {
                 const cleanStr = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+                const optClean = (optText || '').toLowerCase().trim();
+                const optNorm = cleanStr(optText);
                 const targetLabel = cleanStr(qLabel);
                 const targetWords = targetLabel.split(' ').filter(w => w.length > 1);
 
-                // Use ONLY top-level question blocks (div[role="listitem"])
+                // Use top-level question blocks
                 let blocks = Array.from(document.querySelectorAll('div[role="listitem"]'));
                 if (blocks.length === 0) {
                     blocks = Array.from(document.querySelectorAll('.geS5n, fieldset'));
@@ -516,7 +517,7 @@ class BrowserTool:
                 if (targetLabel) {
                     let bestScore = 0;
                     blocks.forEach((b) => {
-                        const headingEl = b.querySelector('.M7eMe, div[role="heading"], label, legend, span');
+                        const headingEl = b.querySelector('.M7eMe, div[role="heading"], legend, label');
                         if (!headingEl) return;
                         const hText = cleanStr(headingEl.innerText);
                         if (!hText) return;
@@ -545,35 +546,87 @@ class BrowserTool:
                     targetBlock = blocks[qIdx];
                 }
 
-                const searchRoots = targetBlock ? [targetBlock] : blocks;
+                // Helper to check if a container matches the option
+                const isOptionMatch = (rValue, rText) => {
+                    const rv = (rValue || '').toLowerCase().trim();
+                    const rt = (rText || '').toLowerCase().trim();
+                    const rvn = cleanStr(rv);
+                    const rtn = cleanStr(rt);
 
-                for (const searchRoot of searchRoots) {
-                    const containers = Array.from(searchRoot.querySelectorAll('.docssharedWizToggleLabeledContainer, div[role="radio"], label, .nWQGrd, input[type="radio"]'));
+                    // Exact or normalized match (e.g. "8-9" vs "8 9" vs "8 - 9")
+                    if (rv === optClean || rt === optClean) return true;
+                    if (optNorm && (rvn === optNorm || rtn === optNorm)) return true;
 
+                    // Prefix match
+                    if (rt.startsWith(optClean) || rv.startsWith(optClean)) return true;
+                    if (optNorm && (rtn.startsWith(optNorm) || rvn.startsWith(optNorm))) return true;
+
+                    // Substring match
+                    if (optClean.length >= 2 && (rt.includes(optClean) || rv.includes(optClean))) return true;
+                    if (optNorm.length >= 2 && (rtn.includes(optNorm) || rvn.includes(optNorm))) return true;
+
+                    return false;
+                };
+
+                const clickRadio = (cont, radioEl) => {
+                    cont.scrollIntoView({ behavior: 'auto', block: 'center' });
+                    try { cont.click(); } catch(e) {}
+                    try { radioEl.click(); } catch(e) {}
+                    
+                    ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click', 'change', 'input'].forEach(evtName => {
+                        try { radioEl.dispatchEvent(new Event(evtName, { bubbles: true, cancelable: true })); } catch(e) {}
+                        try { cont.dispatchEvent(new Event(evtName, { bubbles: true, cancelable: true })); } catch(e) {}
+                    });
+
+                    radioEl.setAttribute('aria-checked', 'true');
+                    if (radioEl.tagName && radioEl.tagName.toLowerCase() === 'input') {
+                        radioEl.checked = true;
+                    }
+                    return true;
+                };
+
+                // Pass 1: Search within targetBlock
+                if (targetBlock) {
+                    const containers = Array.from(targetBlock.querySelectorAll('.docssharedWizToggleLabeledContainer, div[role="radio"], label, .nWQGrd, input[type="radio"]'));
                     for (const cont of containers) {
                         const radioEl = cont.getAttribute('role') === 'radio' ? cont : (cont.querySelector('div[role="radio"], input[type="radio"]') || cont);
-                        const rValue = (radioEl.getAttribute('data-value') || radioEl.getAttribute('aria-label') || radioEl.value || '').toLowerCase().trim();
-                        const rText = (cont.innerText || '').toLowerCase().trim();
-
-                        if (rValue === optClean || rText === optClean || rText.startsWith(optClean) || rValue.startsWith(optClean) || (optClean.length >= 3 && (rValue.includes(optClean) || rText.includes(optClean)))) {
-                            cont.scrollIntoView({ behavior: 'auto', block: 'center' });
-                            
-                            try { cont.click(); } catch(e) {}
-                            try { radioEl.click(); } catch(e) {}
-                            
-                            ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click', 'change', 'input'].forEach(evtName => {
-                                try { radioEl.dispatchEvent(new Event(evtName, { bubbles: true, cancelable: true })); } catch(e) {}
-                                try { cont.dispatchEvent(new Event(evtName, { bubbles: true, cancelable: true })); } catch(e) {}
-                            });
-
-                            radioEl.setAttribute('aria-checked', 'true');
-                            if (radioEl.tagName && radioEl.tagName.toLowerCase() === 'input') {
-                                radioEl.checked = true;
-                            }
-                            return true;
+                        const rValue = radioEl.getAttribute('data-value') || radioEl.getAttribute('aria-label') || radioEl.value || '';
+                        const rText = cont.innerText || '';
+                        if (isOptionMatch(rValue, rText)) {
+                            return clickRadio(cont, radioEl);
                         }
                     }
                 }
+
+                // Pass 2: Search ALL question blocks for matching question heading + option
+                for (const b of blocks) {
+                    const headingEl = b.querySelector('.M7eMe, div[role="heading"], legend, label');
+                    const hText = headingEl ? cleanStr(headingEl.innerText) : '';
+                    const hasCommonWords = targetWords.some(w => hText.includes(w));
+                    if (hasCommonWords || !targetLabel) {
+                        const containers = Array.from(b.querySelectorAll('.docssharedWizToggleLabeledContainer, div[role="radio"], label, .nWQGrd, input[type="radio"]'));
+                        for (const cont of containers) {
+                            const radioEl = cont.getAttribute('role') === 'radio' ? cont : (cont.querySelector('div[role="radio"], input[type="radio"]') || cont);
+                            const rValue = radioEl.getAttribute('data-value') || radioEl.getAttribute('aria-label') || radioEl.value || '';
+                            const rText = cont.innerText || '';
+                            if (isOptionMatch(rValue, rText)) {
+                                return clickRadio(cont, radioEl);
+                            }
+                        }
+                    }
+                }
+
+                // Pass 3: Global fallback — if matching radio option exists anywhere in the form
+                const allRadios = Array.from(document.querySelectorAll('.docssharedWizToggleLabeledContainer, div[role="radio"], input[type="radio"]'));
+                for (const cont of allRadios) {
+                    const radioEl = cont.getAttribute('role') === 'radio' ? cont : (cont.querySelector('div[role="radio"], input[type="radio"]') || cont);
+                    const rValue = radioEl.getAttribute('data-value') || radioEl.getAttribute('aria-label') || radioEl.value || '';
+                    const rText = cont.innerText || '';
+                    if (isOptionMatch(rValue, rText)) {
+                        return clickRadio(cont, radioEl);
+                    }
+                }
+
                 return false;
             }""", [question_index, option_text, question_label])
             if success:
