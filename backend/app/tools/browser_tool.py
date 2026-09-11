@@ -464,9 +464,23 @@ class BrowserTool:
                 if (input) {
                     input.scrollIntoView({ behavior: 'auto', block: 'center' });
                     input.focus();
+
+                    let finalVal = valStr;
+                    if (input.type === 'date') {
+                        // Ensure standard YYYY-MM-DD format for HTML5 date inputs
+                        const parts = valStr.split(/[\/\-\.]/);
+                        if (parts.length === 3) {
+                            if (parts[0].length === 4) {
+                                finalVal = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+                            } else if (parts[2].length === 4) {
+                                finalVal = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                            }
+                        }
+                    }
+
                     input.value = '';
                     input.dispatchEvent(new Event('input', { bubbles: true }));
-                    input.value = valStr;
+                    input.value = finalVal;
                     input.dispatchEvent(new Event('input', { bubbles: true }));
                     input.dispatchEvent(new Event('change', { bubbles: true }));
                     input.blur();

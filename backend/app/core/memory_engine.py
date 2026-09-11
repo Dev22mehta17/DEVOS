@@ -338,6 +338,21 @@ Custom Notes: {extra.get('custom_user_notes', '')}
         if "gender" in field_lower:
             return self.profile_data.get("personal", {}).get("gender")
 
+        # 4.5 Date questions: Available date, Joining date, Start date, Date of birth
+        if any(k in field_lower for k in ["birth", "dob", "date of birth"]):
+            return self.profile_data.get("personal", {}).get("date_of_birth") or "2004-05-17"
+
+        if any(k in field_lower for k in [
+            "available date", "availability date", "joining date", "start date", "earliest start",
+            "earliest available", "available to join", "join date", "date available", "when can you start",
+            "expected date of joining", "doj", "availability"
+        ]) or (field_lower.strip() in ["date", "date *", "today date", "current date"]):
+            from datetime import datetime
+            today = datetime.now()
+            if any(k in field_lower for k in ["dd/mm", "dd-mm", "day/month"]):
+                return today.strftime("%d/%m/%Y")
+            return today.strftime("%Y-%m-%d")
+
         # Candidate Name (Only if NOT college name, company name, school name, project name)
         if any(k in field_lower for k in ["full name", "your name", "candidate name", "applicant name", "first name"]) or \
            (field_lower.strip() in ["name", "name *"] or ("name" in field_lower and not any(x in field_lower for x in ["college", "univ", "school", "comp", "employ", "org", "proj", "role", "file", "skill", "institute", "father", "mother"]))):
@@ -419,6 +434,45 @@ Custom Notes: {extra.get('custom_user_notes', '')}
                 for opt in options:
                     if any(c.isdigit() for c in opt) and grad_year in opt:
                         return {"matched_option": opt, "confidence": "medium"}
+
+        # --- CGPA / GPA / Percentage Ranges ---
+        # e.g. "Graduation CGPA *", options: ["6-7", "7-8", "8-9", "9-10", "Other:"]
+        if any(k in q_lower for k in ["cgpa", "gpa", "pointer", "grade", "percentage", "marks"]):
+            cgpa_str = self.profile_data.get("education", {}).get("cgpa") or self.profile_data.get("education", {}).get("gpa") or "8.7"
+            try:
+                import re
+                cgpa_num_match = re.search(r'(\d+(?:\.\d+)?)', str(cgpa_str).strip())
+                if cgpa_num_match:
+                    cgpa_val = float(cgpa_num_match.group(1))
+                    for opt in options:
+                        opt_cleaned = opt.strip()
+                        if opt_cleaned.lower().startswith("other"):
+                            continue
+                        # Match ranges like "8-9", "8.0 - 9.0", "8 to 9", "8 - 9"
+                        range_match = re.findall(r'(\d+(?:\.\d+)?)', opt_cleaned)
+                        if len(range_match) >= 2:
+                            low = float(range_match[0])
+                            high = float(range_match[1])
+                            if low <= cgpa_val <= high:
+                                return {"matched_option": opt, "confidence": "high"}
+                        elif len(range_match) == 1:
+                            single_val = float(range_match[0])
+                            if (">" in opt or "above" in opt.lower() or "+" in opt) and cgpa_val >= single_val:
+                                return {"matched_option": opt, "confidence": "high"}
+                            if ("<" in opt or "below" in opt.lower() or "less" in opt.lower()) and cgpa_val <= single_val:
+                                return {"matched_option": opt, "confidence": "high"}
+                            if abs(cgpa_val - single_val) < 0.3:
+                                return {"matched_option": opt, "confidence": "high"}
+            except Exception as e:
+                logger.warning(f"Error matching CGPA option: {e}")
+
+        # --- Rating Scales (1-5, 1-10) ---
+        # e.g. "rate yourself in c++ *", options: ["1", "2", "3", "4", "5"]
+        if any(k in q_lower for k in ["rate", "rating", "scale of", "score yourself", "knowledge of", "proficiency"]):
+            for target in ["4", "5", "8", "9", "expert", "proficient", "advanced", "good"]:
+                for opt in options:
+                    if opt.strip().lower() == target or opt.strip() == target:
+                        return {"matched_option": opt, "confidence": "high"}
 
         # --- Gender ---
         if "gender" in q_lower:

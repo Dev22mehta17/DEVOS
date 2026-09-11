@@ -208,7 +208,7 @@ export default function FormReviewModal({ formData, onApprove, onReject }) {
 
   return (
     <div className="modal-overlay">
-      <div className="glass-panel modal-card" style={{ maxWidth: '800px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+      <div className="glass-panel modal-card" style={{ maxWidth: '800px', width: '95%', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}>
         <div className="modal-header" style={{ marginBottom: '1rem' }}>
           <FileText size={24} color="#00e676" />
           <div>
