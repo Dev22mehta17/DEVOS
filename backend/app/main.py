@@ -96,14 +96,21 @@ async def stream_logs(request: Request):
                 if await request.is_disconnected():
                     break
                 try:
-                    event = await asyncio.wait_for(client_queue.get(), timeout=1.0)
-                    yield {"data": json.dumps(event)}
+                    event = await asyncio.wait_for(client_queue.get(), timeout=15.0)
+                    yield {"data": json.dumps(event), "retry": 3000}
                 except asyncio.TimeoutError:
-                    yield {"data": json.dumps({"step_type": "HEARTBEAT", "message": "ping"})}
+                    yield {"data": json.dumps({"step_type": "HEARTBEAT", "message": "ping"}), "retry": 3000}
         finally:
             active_subscribers.discard(client_queue)
 
-    return EventSourceResponse(event_generator())
+    return EventSourceResponse(
+        event_generator(),
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        }
+    )
 
 @app.get("/api/memory")
 async def get_profile_memory():

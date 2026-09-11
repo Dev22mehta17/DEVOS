@@ -27,15 +27,28 @@ class MemoryEngine:
 
     def save_profile(self, data: Dict[str, Any]) -> bool:
         try:
+            # Deep-merge incoming data with existing profile to preserve unedited fields
+            merged = self._deep_merge(self.profile_data.copy(), data)
             self.profile_file.parent.mkdir(parents=True, exist_ok=True)
             with open(self.profile_file, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2)
-            self.profile_data = data
-            logger.info("Profile updated successfully.")
+                json.dump(merged, f, indent=2)
+            self.profile_data = merged
+            logger.info("Profile updated and persisted to disk successfully.")
             return True
         except Exception as e:
             logger.error(f"Error saving profile: {e}")
             return False
+
+    @staticmethod
+    def _deep_merge(base: Dict, override: Dict) -> Dict:
+        """Recursively merge override into base. Override values take priority."""
+        result = base.copy()
+        for key, value in override.items():
+            if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+                result[key] = MemoryEngine._deep_merge(result[key], value)
+            else:
+                result[key] = value
+        return result
 
     def _init_vector_db(self):
         """Initializes ChromaDB vector memory for semantic context retrieval."""
