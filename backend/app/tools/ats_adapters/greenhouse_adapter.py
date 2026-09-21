@@ -178,25 +178,51 @@ class GreenhouseAdapter:
                 // Skip labels that are already handled by standard fields
                 const skipLabels = ['first name', 'last name', 'email', 'phone', 'resume', 'cover letter', 'cv'];
 
+                // Skip internal / hidden / system fields
+                const junkPatterns = [
+                    /recaptcha/i, /captcha/i, /g-recaptcha/i,
+                    /^[0-9a-f]{8}[-\s][0-9a-f]{4}/i,    // UUID-like labels
+                    /^[0-9a-f]{20,}/i,                    // Long hex strings
+                    /^start typing/i, /^select\.\.\./i, /^choose/i, /^type here/i,
+                    /^on$/i, /^off$/i, /^submit$/i, /^send$/i,
+                    /^hidden/i, /^csrf/i, /^token/i, /^_/,
+                    /^compliance/i, /^data.?processing/i,
+                    /^gdpr/i, /^consent/i
+                ];
+
                 fieldContainers.forEach((f, idx) => {
+                    // Skip hidden or invisible containers
+                    const style = window.getComputedStyle(f);
+                    if (style.display === 'none' || style.visibility === 'hidden' || f.offsetHeight === 0) return;
+
                     const labelEl = f.querySelector('label, .label, legend, span.label, div[class*="label"]');
                     let label = labelEl ? labelEl.innerText.trim() : '';
                     // Clean up asterisks and whitespace
                     label = label.replace(/\\s*\\*\\s*$/, '').trim();
-                    if (!label) return;
+                    if (!label || label.length < 3) return;
                     const labelLower = label.toLowerCase();
 
                     // Skip already-handled standard fields
                     if (skipLabels.some(skip => labelLower.includes(skip))) return;
 
-                    const select = f.querySelector('select');
-                    const textarea = f.querySelector('textarea');
+                    // Skip junk / internal / system fields
+                    if (junkPatterns.some(pat => pat.test(label))) return;
+
+                    const select = f.querySelector('select:not([style*="display: none"]):not([style*="visibility: hidden"])');
+                    const textarea = f.querySelector('textarea:not([style*="display: none"]):not([name*="recaptcha"]):not([id*="recaptcha"])');
+                    const checkbox = f.querySelector('input[type="checkbox"]');
                     const textInput = f.querySelector('input[type="text"], input[type="url"], input:not([type="hidden"]):not([type="file"]):not([type="submit"]):not([type="checkbox"]):not([type="radio"])');
+
+                    // If this container only has a checkbox (no select/textarea/text), skip it
+                    if (checkbox && !select && !textarea && !textInput) return;
 
                     if (select) {
                         const selectId = select.id || select.name || '';
                         if (seenIds.has(selectId) && selectId) return;
                         if (selectId) seenIds.add(selectId);
+                        // Skip if the select itself is hidden
+                        const selStyle = window.getComputedStyle(select);
+                        if (selStyle.display === 'none' || selStyle.visibility === 'hidden') return;
                         const opts = Array.from(select.options)
                             .map(o => o.text.trim())
                             .filter(t => t && t !== 'Select...' && t !== 'Select' && t !== '--' && t !== '');
@@ -205,12 +231,17 @@ class GreenhouseAdapter:
                         const taId = textarea.id || textarea.name || '';
                         if (seenIds.has(taId) && taId) return;
                         if (taId) seenIds.add(taId);
+                        // Skip hidden textareas (reCAPTCHA, etc.)
+                        const taStyle = window.getComputedStyle(textarea);
+                        if (taStyle.display === 'none' || taStyle.visibility === 'hidden' || textarea.offsetHeight === 0) return;
                         results.push({ index: idx, label: label, type: 'textarea', id: taId, currentValue: textarea.value || '' });
                     } else if (textInput) {
                         const inputId = textInput.id || textInput.name || '';
                         if (seenIds.has(inputId) && inputId) return;
                         if (inputId) seenIds.add(inputId);
-                        // Include text inputs even if they have a value (we might want to verify/override)
+                        // Skip hidden inputs
+                        const inpStyle = window.getComputedStyle(textInput);
+                        if (inpStyle.display === 'none' || inpStyle.visibility === 'hidden' || textInput.offsetHeight === 0) return;
                         const currentVal = textInput.value || '';
                         results.push({ index: idx, label: label, type: 'text', id: inputId, currentValue: currentVal });
                     }
