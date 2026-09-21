@@ -16,9 +16,15 @@ class GreenhouseAdapter:
     """Specialized automation adapter for Greenhouse ATS (boards.greenhouse.io)."""
 
     @staticmethod
-    async def fill_application(url: str, goal_description: str = "") -> Dict[str, Any]:
+    async def fill_application(url: str, goal_description: str = "", email_override: Optional[str] = None) -> Dict[str, Any]:
         action_id = f"greenhouse_{uuid.uuid4().hex[:8]}"
         logger.info(f"[GreenhouseAdapter] Opening job post: {url}")
+
+        if not email_override and goal_description:
+            import re
+            em_match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', goal_description)
+            if em_match:
+                email_override = em_match.group(0).strip()
 
         # Step 1: Navigate to Greenhouse application page
         nav_res = await browser_tool.navigate(url)
@@ -44,7 +50,7 @@ class GreenhouseAdapter:
         name_parts = full_name.split()
         first_name = name_parts[0] if name_parts else "Dev"
         last_name = " ".join(name_parts[1:]) if len(name_parts) > 1 else "Mehta"
-        email = personal.get("email_primary", "mehtadev2004@gmail.com")
+        email = email_override or memory_engine.get_field_value("email") or personal.get("email_primary", "mehtadev2004@gmail.com")
         phone = personal.get("phone", "+91-7206049507")
         location = personal.get("location", "India")
         links = p.get("links", {})

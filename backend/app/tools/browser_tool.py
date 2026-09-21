@@ -317,6 +317,28 @@ class BrowserTool:
                     }
                 });
 
+                // Ensure top-level or standalone Email input is captured if not already in results
+                if (results.length > 0) {
+                    const hasEmailInResults = results.some(r => (r.type === 'email' || (r.labelText || '').toLowerCase().includes('email')));
+                    if (!hasEmailInResults) {
+                        const emailInput = document.querySelector('input[type="email"], input[name="emailAddress"], input[name*="email"], input[autocomplete="email"]');
+                        if (emailInput) {
+                            results.unshift({
+                                id: emailInput.id || `input_email_top`,
+                                name: emailInput.name || 'emailAddress',
+                                type: 'email',
+                                tagName: 'input',
+                                placeholder: emailInput.placeholder || 'Your email',
+                                labelText: 'Email Address',
+                                value: emailInput.value || '',
+                                required: true,
+                                questionIndex: 0,
+                                fieldType: 'text'
+                            });
+                        }
+                    }
+                }
+
                 // Universal Scanner for non-Google-Forms pages (Taleo, Greenhouse, Lever, Workday, Portals)
                 if (results.length === 0) {
                     const allInputs = Array.from(document.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"]), textarea, select'));

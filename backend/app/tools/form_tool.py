@@ -2,7 +2,7 @@ import os
 import logging
 import uuid
 import asyncio
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from app.tools.browser_tool import browser_tool
 from app.tools.file_tool import file_tool
 from app.core.memory_engine import memory_engine
@@ -13,8 +13,16 @@ logger = logging.getLogger(__name__)
 
 class FormTool:
     @staticmethod
-    async def process_form(form_url: str) -> Dict[str, Any]:
+    async def process_form(form_url: str, goal_description: str = "", email_override: Optional[str] = None) -> Dict[str, Any]:
         action_id = f"form_{uuid.uuid4().hex[:8]}"
+
+        # Extract email override from goal description if not explicitly supplied
+        if not email_override and goal_description:
+            import re
+            em_match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', goal_description)
+            if em_match:
+                email_override = em_match.group(0).strip()
+                logger.info(f"[FormTool] Using email override from goal: {email_override}")
 
         # Step 1: Open Form URL
         nav_result = await browser_tool.navigate(form_url)
@@ -173,7 +181,11 @@ class FormTool:
                 continue
 
             # ─── Text / Textarea / Email / Phone / etc ───
-            val = memory_engine.get_field_value(label)
+            is_email_field = any(k in label.lower() for k in ["email", "mail", "e-mail", "gmail"])
+            if is_email_field:
+                val = email_override or memory_engine.get_field_value(label) or memory_engine.get_field_value("email") or "mehtadev2004@gmail.com"
+            else:
+                val = memory_engine.get_field_value(label)
             if val is not None and val != "":
                 idx = text_input_idx
                 name_str = inp.get("name", "")

@@ -16,9 +16,15 @@ class LeverAdapter:
     """Specialized automation adapter for Lever ATS (jobs.lever.co)."""
 
     @staticmethod
-    async def fill_application(url: str, goal_description: str = "") -> Dict[str, Any]:
+    async def fill_application(url: str, goal_description: str = "", email_override: Optional[str] = None) -> Dict[str, Any]:
         action_id = f"lever_{uuid.uuid4().hex[:8]}"
         logger.info(f"[LeverAdapter] Opening Lever job post: {url}")
+
+        if not email_override and goal_description:
+            import re
+            em_match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', goal_description)
+            if em_match:
+                email_override = em_match.group(0).strip()
 
         nav_res = await browser_tool.navigate(url)
         await asyncio.sleep(2.5)
@@ -45,7 +51,7 @@ class LeverAdapter:
         p = memory_engine.profile_data
         personal = p.get("personal", {})
         full_name = personal.get("full_name", "Dev Mehta")
-        email = personal.get("email_primary", "mehtadev2004@gmail.com")
+        email = email_override or memory_engine.get_field_value("email") or personal.get("email_primary", "mehtadev2004@gmail.com")
         phone = personal.get("phone", "+91-7206049507")
         current_company = p.get("professional", {}).get("current_company", "Amazon Pay India")
         links = p.get("links", {})

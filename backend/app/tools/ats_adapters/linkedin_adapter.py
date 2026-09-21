@@ -15,7 +15,7 @@ class LinkedInEasyApplyAdapter:
     """Semi-autonomous assistant for LinkedIn Easy Apply job applications."""
 
     @staticmethod
-    async def apply_to_job(job_url: str, goal_description: str = "") -> Dict[str, Any]:
+    async def apply_to_job(job_url: str, goal_description: str = "", email_override: Optional[str] = None) -> Dict[str, Any]:
         action_id = f"linkedin_{uuid.uuid4().hex[:8]}"
         # Normalize search-results or collection URLs to clean direct view URL
         import re
@@ -147,8 +147,15 @@ class LinkedInEasyApplyAdapter:
                 await asyncio.sleep(2.5)
 
         # Step 3: Candidate Data from Memory
+        if not email_override and goal_description:
+            import re
+            em_match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', goal_description)
+            if em_match:
+                email_override = em_match.group(0).strip()
+
         p = memory_engine.profile_data
         personal = p.get("personal", {})
+        chosen_email = email_override or memory_engine.get_field_value("email") or personal.get("email_primary", "mehtadev2004@gmail.com")
         phone = personal.get("phone", "7206049507")
         clean_phone = phone.replace("+91-", "").replace("+91", "").replace(" ", "").replace("-", "")
 
@@ -177,6 +184,38 @@ class LinkedInEasyApplyAdapter:
                 logger.info("[LinkedInAdapter] ✅ Reached final review screen before submission!")
                 reached_review = True
                 break
+
+            # Fill or select Email address if visible on Contact info step
+            try:
+                email_select = await page.query_selector('select[id*="email"], select[name*="email"], select[aria-label*="Email" i]')
+                if email_select and await email_select.is_visible():
+                    await page.evaluate("""({sel, targetEmail}) => {
+                        const opts = Array.from(sel.options);
+                        const match = opts.find(o => o.text.toLowerCase().includes(targetEmail.toLowerCase()) || o.value.toLowerCase().includes(targetEmail.toLowerCase()));
+                        if (match) {
+                            sel.value = match.value;
+                            sel.dispatchEvent(new Event('change', {bubbles: true}));
+                            sel.dispatchEvent(new Event('input', {bubbles: true}));
+                        }
+                    }""", {"sel": email_select, "targetEmail": chosen_email})
+                    filled_fields.append({
+                        "field_label": "Email Address",
+                        "value": chosen_email,
+                        "fieldType": "dropdown",
+                        "is_auto_matched": True
+                    })
+                else:
+                    email_input = await page.query_selector('input[type="email"], input[id*="email"], input[name*="email"], input[aria-label*="Email" i]')
+                    if email_input and await email_input.is_visible():
+                        await email_input.fill(chosen_email)
+                        filled_fields.append({
+                            "field_label": "Email Address",
+                            "value": chosen_email,
+                            "fieldType": "text",
+                            "is_auto_matched": True
+                        })
+            except Exception as e_err:
+                logger.debug(f"[LinkedInAdapter] Email fill ignored: {e_err}")
 
             # Fill phone number if visible
             try:

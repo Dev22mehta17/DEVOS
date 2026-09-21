@@ -73,21 +73,25 @@ class AgentExecutor:
                 await emit_agent_event("DOM_ACTION", f"Step 2/7: Inspecting application inputs and control elements...")
                 await emit_agent_event("MEMORY_QUERY", "Step 3/7: Retrieving candidate profile attributes & matching resume...")
 
+                email_override = interpreted.get("email_override")
+                if email_override:
+                    await emit_agent_event("MEMORY_QUERY", f"Applying custom email override from prompt: '{email_override}'")
+
                 if platform == ATSPlatform.GREENHOUSE:
                     await emit_agent_event("DOM_ACTION", "Step 4/7: Detected Greenhouse ATS. Running Greenhouse Adapter...")
-                    form_res = await greenhouse_adapter.fill_application(target_url, goal_text)
+                    form_res = await greenhouse_adapter.fill_application(target_url, goal_text, email_override=email_override)
 
                 elif platform == ATSPlatform.LEVER:
                     await emit_agent_event("DOM_ACTION", "Step 4/7: Detected Lever ATS. Running Lever Adapter...")
-                    form_res = await lever_adapter.fill_application(target_url, goal_text)
+                    form_res = await lever_adapter.fill_application(target_url, goal_text, email_override=email_override)
 
                 elif platform == ATSPlatform.LINKEDIN:
                     await emit_agent_event("DOM_ACTION", "Step 4/7: Detected LinkedIn Job. Running LinkedIn Easy Apply Wizard...")
-                    form_res = await linkedin_adapter.apply_to_job(target_url, goal_text)
+                    form_res = await linkedin_adapter.apply_to_job(target_url, goal_text, email_override=email_override)
 
                 elif platform == ATSPlatform.GOOGLE_FORMS:
                     await emit_agent_event("DOM_ACTION", "Step 4/7: Detected Google Form. Running Google Form Engine...")
-                    form_res = await form_tool.process_form(target_url)
+                    form_res = await form_tool.process_form(target_url, goal_description=goal_text, email_override=email_override)
 
                 else:
                     await emit_agent_event("DOM_ACTION", "Step 4/7: Running Universal Web Application Engine...")

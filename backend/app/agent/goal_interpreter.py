@@ -39,6 +39,7 @@ class GoalInterpreter:
                 "action_kind": "APPLY_JOB",
                 "target_url": target_url,
                 "portal_kind": portal_kind,
+                "email_override": email_recipient,
                 "attach_resume": "resume" in text_lower or "cv" in text_lower or True,
                 "original_prompt": text_clean,
                 "requires_hitl": True

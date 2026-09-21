@@ -174,7 +174,10 @@ Custom Notes: {extra.get('custom_user_notes', '')}
             if "professional" not in self.profile_data: self.profile_data["professional"] = {}
 
             if email_match:
-                self.profile_data["personal"]["email_primary"] = email_match.group(0)
+                if not self.profile_data["personal"].get("email_primary"):
+                    self.profile_data["personal"]["email_primary"] = email_match.group(0)
+                # Store detected document email as an alternative
+                self.profile_data["personal"]["email_document"] = email_match.group(0)
             if phone_match:
                 self.profile_data["personal"]["phone"] = phone_match.group(0).strip()
             if linkedin_match and "linkedin" not in self.profile_data.get("links", {}):
@@ -235,6 +238,22 @@ Custom Notes: {extra.get('custom_user_notes', '')}
         if not overrides_text.strip():
             return None
         
+        # 0. Email override from free-form text or key-value (e.g. "email: foo@bar.com", "use email foo@bar.com")
+        if any(k in field_lower for k in ["email", "mail", "e mail"]):
+            import re
+            for line in overrides_text.splitlines():
+                line_clean = line.strip()
+                line_lower = line_clean.lower()
+                if any(line_lower.startswith(p) for p in ["email:", "mail:", "email=", "mail=", "primary email:", "email address:"]):
+                    parts = line_clean.split(":" if ":" in line_clean else "=", 1)
+                    m = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', parts[1])
+                    if m:
+                        return m.group(0).strip()
+            # If user entered an email address anywhere in the overrides box
+            all_emails = re.findall(r'[\w\.-]+@[\w\.-]+\.\w+', overrides_text)
+            if all_emails:
+                return all_emails[0].strip()
+
         # 1. Location / Address / Native Place / Hometown / Residing detection from free-form text
         if any(k in field_lower for k in ["native", "residing", "reside", "live", "hometown", "location", "address", "city", "stay", "home town", "where do you", "current address", "permanent address"]):
             # If user mentioned Bhiwani or Haryana in custom notes / overrides
@@ -312,8 +331,12 @@ Custom Notes: {extra.get('custom_user_notes', '')}
             return self.profile_data.get("professional", {}).get("current_company")
 
         # 4. Personal Contact, Location & Candidate Name
-        if "email" in field_lower:
-            return self.profile_data.get("personal", {}).get("email_primary")
+        if any(k in field_lower for k in ["email", "mail", "e-mail"]):
+            return (
+                self.profile_data.get("personal", {}).get("active_email") or
+                self.profile_data.get("personal", {}).get("email_primary") or
+                "mehtadev2004@gmail.com"
+            )
         if any(k in field_lower for k in ["phone", "mobile", "contact", "whatsapp", "cell"]):
             return self.profile_data.get("personal", {}).get("phone")
 

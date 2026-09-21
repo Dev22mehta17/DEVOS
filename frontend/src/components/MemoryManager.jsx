@@ -92,13 +92,85 @@ export default function MemoryManager({ profile, onSave }) {
             onChange={(e) => handleChange('personal', 'full_name', e.target.value)}
             placeholder="Full Name"
           />
-          <input
-            className="prompt-input"
-            style={{ width: '100%', marginBottom: '0.35rem' }}
-            value={memoryData.personal?.email_primary || ''}
-            onChange={(e) => handleChange('personal', 'email_primary', e.target.value)}
-            placeholder="Primary Email"
-          />
+          <div style={{ marginBottom: '0.4rem' }}>
+            <label style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.2rem' }}>
+              Primary Email (Active for Applications):
+            </label>
+            <input
+              className="prompt-input"
+              style={{ width: '100%', marginBottom: '0.35rem' }}
+              value={memoryData.personal?.email_primary || ''}
+              onChange={(e) => {
+                handleChange('personal', 'email_primary', e.target.value);
+                handleChange('personal', 'active_email', e.target.value);
+              }}
+              placeholder="Primary Email (e.g. mehtadev2004@gmail.com)"
+            />
+          </div>
+
+          <div style={{ marginBottom: '0.45rem' }}>
+            <label style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.2rem' }}>
+              Alternative / Secondary Email:
+            </label>
+            <input
+              className="prompt-input"
+              style={{ width: '100%', marginBottom: '0.35rem' }}
+              value={memoryData.personal?.email_secondary || ''}
+              onChange={(e) => handleChange('personal', 'email_secondary', e.target.value)}
+              placeholder="Secondary Email (e.g. mehtawork69@gmail.com)"
+            />
+          </div>
+
+          {/* Quick Active Email Switcher */}
+          <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.72rem', color: 'var(--accent-cyan)', fontWeight: 600 }}>Active Email:</span>
+            {memoryData.personal?.email_primary && (
+              <button
+                type="button"
+                onClick={() => handleChange('personal', 'active_email', memoryData.personal.email_primary)}
+                style={{
+                  padding: '0.2rem 0.5rem',
+                  fontSize: '0.72rem',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  border: (memoryData.personal?.active_email === memoryData.personal?.email_primary || !memoryData.personal?.active_email)
+                    ? '1px solid var(--accent-cyan)'
+                    : '1px solid var(--border-color)',
+                  background: (memoryData.personal?.active_email === memoryData.personal?.email_primary || !memoryData.personal?.active_email)
+                    ? 'rgba(0, 242, 254, 0.18)'
+                    : 'transparent',
+                  color: (memoryData.personal?.active_email === memoryData.personal?.email_primary || !memoryData.personal?.active_email)
+                    ? 'var(--accent-cyan)'
+                    : 'var(--text-muted)'
+                }}
+              >
+                ● Primary ({memoryData.personal.email_primary.split('@')[0]})
+              </button>
+            )}
+            {memoryData.personal?.email_secondary && (
+              <button
+                type="button"
+                onClick={() => handleChange('personal', 'active_email', memoryData.personal.email_secondary)}
+                style={{
+                  padding: '0.2rem 0.5rem',
+                  fontSize: '0.72rem',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  border: memoryData.personal?.active_email === memoryData.personal?.email_secondary
+                    ? '1px solid var(--accent-purple)'
+                    : '1px solid var(--border-color)',
+                  background: memoryData.personal?.active_email === memoryData.personal?.email_secondary
+                    ? 'rgba(127, 0, 255, 0.18)'
+                    : 'transparent',
+                  color: memoryData.personal?.active_email === memoryData.personal?.email_secondary
+                    ? 'var(--accent-purple)'
+                    : 'var(--text-muted)'
+                }}
+              >
+                ● Work/Alt ({memoryData.personal.email_secondary.split('@')[0]})
+              </button>
+            )}
+          </div>
           <input
             className="prompt-input"
             style={{ width: '100%', marginBottom: '0.35rem' }}
@@ -281,10 +353,10 @@ export default function MemoryManager({ profile, onSave }) {
             onChange={(e) => {
               handleChange('extra_context', 'form_overrides', e.target.value);
             }}
-            placeholder="e.g. My native place and where I am currently residing is Bhiwani, Haryana. Location is Bhiwani, Haryana."
+            placeholder="e.g. My native place is Bhiwani, Haryana. Or specify 'email: mehtadev2004@gmail.com' to dynamically override email for any form."
           />
           <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.3rem', lineHeight: 1.3 }}>
-            💡 DevOS checks this box first before standard memory for native place, address, city, and custom rules.
+            💡 DevOS checks this box first before standard memory for email, location, address, city, and custom rules.
           </div>
         </div>
 
