@@ -572,21 +572,71 @@ Custom Notes: {extra.get('custom_user_notes', '')}
                 if opt.lower().strip() in ["yes", "yes, comfortable", "yes, willing", "yes, open", "yes - wfo"]:
                     return {"matched_option": opt, "confidence": "high"}
 
+        # --- Country / Residence ---
+        if any(k in q_lower for k in ["country", "residence", "located in which country", "country of residence"]):
+            location = self.profile_data.get("personal", {}).get("location", "India")
+            country = "India"  # Default
+            if "india" in location.lower() or "bhiwani" in location.lower() or "haryana" in location.lower() or "delhi" in location.lower() or "patiala" in location.lower():
+                country = "India"
+            for opt in options:
+                if opt.strip().lower() == country.lower() or country.lower() in opt.lower():
+                    return {"matched_option": opt, "confidence": "high"}
+
+        # --- "Are you currently located in [City]?" ---
+        if any(k in q_lower for k in ["located in bangalore", "located in bengaluru", "located in pune", "located in hyderabad",
+                                       "located in gurgaon", "located in gurugram", "located in mumbai", "located in delhi",
+                                       "located in noida", "located in chennai", "located in kolkata"]):
+            user_city = self.profile_data.get("personal", {}).get("city", "").lower()
+            # Check if user is in that city
+            is_in_city = any(city in q_lower for city in [user_city] if user_city)
+            target_answer = "yes" if is_in_city else "no"
+            for opt in options:
+                if opt.lower().strip() == target_answer or opt.lower().strip().startswith(target_answer):
+                    return {"matched_option": opt, "confidence": "high"}
+
+        # --- Technical Proficiency / Skills Yes/No (Python, JS, REST, LLM, etc.) ---
+        if any(k in q_lower for k in ["proficiency", "proficient", "experience with", "hands-on experience",
+                                       "scripting language", "python", "javascript", "typescript", "rest api",
+                                       "graphql", "integration", "llm", "openai", "anthropic", "open-source",
+                                       "fluency", "practical fluency", "ecosystem",
+                                       "built backend", "backend systems", "consumer-facing",
+                                       "full-stack", "frontend", "react", "fastapi", "aws", "cloud",
+                                       "microservices", "distributed", "machine learning", "ai", "data",
+                                       "comfortable with", "strong understanding"]):
+            for opt in options:
+                if opt.lower().strip() in ["yes", "yes, i do", "yes, have", "yes, i have"]:
+                    return {"matched_option": opt, "confidence": "high"}
+                if opt.lower().strip().startswith("yes"):
+                    return {"matched_option": opt, "confidence": "high"}
+
+        # --- Employment agreements / restrictions / non-compete ---
+        if any(k in q_lower for k in ["employment agreement", "post-employment", "restriction", "non-compete",
+                                       "non compete", "restrictive covenant", "subject to any",
+                                       "criminal", "convicted", "felony", "backlog", "disciplinary"]):
+            for opt in options:
+                if opt.lower().strip() == "no" or opt.lower().strip().startswith("no"):
+                    return {"matched_option": opt, "confidence": "high"}
+
+        # --- Accessibility / Accommodations ---
+        if any(k in q_lower for k in ["accommodation", "accessible", "disability", "special needs", "inclusive"]):
+            for opt in options:
+                if any(k in opt.lower() for k in ["no", "not at this time", "none", "n/a"]):
+                    return {"matched_option": opt, "confidence": "medium"}
+
         # --- Yes/No Fallback for any question having Yes and No (including Yes/No/Maybe) ---
         has_yes = any(opt.lower().strip() == "yes" or opt.lower().strip().startswith("yes") for opt in options)
         has_no = any(opt.lower().strip() == "no" or opt.lower().strip().startswith("no") for opt in options)
         if has_yes and has_no:
-            # Check if question is asking for criminal/disqualification (No) or positive qualification (Yes)
-            if any(k in q_lower for k in ["criminal", "convicted", "fired", "sponsorship in future", "backlog"]):
+            # Check if question is asking about negative things (answer No)
+            if any(k in q_lower for k in ["criminal", "convicted", "fired", "sponsorship in future", "backlog",
+                                           "employment agreement", "post-employment", "restriction", "non-compete"]):
                 for opt in options:
-                    if opt.lower().strip() == "no":
+                    if opt.lower().strip() == "no" or opt.lower().strip().startswith("no"):
                         return {"matched_option": opt, "confidence": "high"}
             else:
                 for opt in options:
                     if opt.lower().strip() == "yes" or opt.lower().strip().startswith("yes"):
                         return {"matched_option": opt, "confidence": "medium"}
-
-        return None
 
         # --- Generic: try semantic memory for best match ---
         if self.collection:
@@ -611,3 +661,4 @@ Custom Notes: {extra.get('custom_user_notes', '')}
 
 # Global instance
 memory_engine = MemoryEngine()
+

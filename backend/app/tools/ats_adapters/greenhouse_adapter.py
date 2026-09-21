@@ -160,54 +160,110 @@ class GreenhouseAdapter:
                 "fieldType": "file"
             })
 
-        # Step 7: Inspect remaining custom questions / dropdowns
+        # Step 7: Inspect remaining custom questions / dropdowns / text fields
         try:
             custom_questions = await page.evaluate("""() => {
                 const results = [];
-                const fields = document.querySelectorAll('.field, .custom-question, div[id*="question"]');
-                fields.forEach((f, idx) => {
-                    const labelEl = f.querySelector('label, .label');
-                    const label = labelEl ? labelEl.innerText.trim() : '';
-                    if (!label || label.toLowerCase().includes('first name') || label.toLowerCase().includes('last name') || label.toLowerCase().includes('email') || label.toLowerCase().includes('phone') || label.toLowerCase().includes('resume')) return;
+                // Broad selector: catch all field wrappers Greenhouse uses
+                const fieldContainers = document.querySelectorAll(
+                    '.field, .custom-question, div[id*="question"], ' +
+                    'div[class*="field"], div[class*="question"], ' +
+                    'div[class*="application-field"], div[class*="custom_fields"], ' +
+                    'li.field, fieldset'
+                );
+
+                // Track which inputs we've already seen to avoid duplicates
+                const seenIds = new Set();
+
+                // Skip labels that are already handled by standard fields
+                const skipLabels = ['first name', 'last name', 'email', 'phone', 'resume', 'cover letter', 'cv'];
+
+                fieldContainers.forEach((f, idx) => {
+                    const labelEl = f.querySelector('label, .label, legend, span.label, div[class*="label"]');
+                    let label = labelEl ? labelEl.innerText.trim() : '';
+                    // Clean up asterisks and whitespace
+                    label = label.replace(/\\s*\\*\\s*$/, '').trim();
+                    if (!label) return;
+                    const labelLower = label.toLowerCase();
+
+                    // Skip already-handled standard fields
+                    if (skipLabels.some(skip => labelLower.includes(skip))) return;
 
                     const select = f.querySelector('select');
                     const textarea = f.querySelector('textarea');
-                    const textInput = f.querySelector('input[type="text"], input:not([type])');
+                    const textInput = f.querySelector('input[type="text"], input[type="url"], input:not([type="hidden"]):not([type="file"]):not([type="submit"]):not([type="checkbox"]):not([type="radio"])');
 
                     if (select) {
-                        const opts = Array.from(select.options).map(o => o.text.trim()).filter(Boolean);
-                        results.push({ index: idx, label: label, type: 'dropdown', options: opts, id: select.id || select.name });
+                        const selectId = select.id || select.name || '';
+                        if (seenIds.has(selectId) && selectId) return;
+                        if (selectId) seenIds.add(selectId);
+                        const opts = Array.from(select.options)
+                            .map(o => o.text.trim())
+                            .filter(t => t && t !== 'Select...' && t !== 'Select' && t !== '--' && t !== '');
+                        results.push({ index: idx, label: label, type: 'dropdown', options: opts, id: selectId, currentValue: select.value });
                     } else if (textarea) {
-                        results.push({ index: idx, label: label, type: 'textarea', id: textarea.id || textarea.name });
-                    } else if (textInput && !textInput.value) {
-                        results.push({ index: idx, label: label, type: 'text', id: textInput.id || textInput.name });
+                        const taId = textarea.id || textarea.name || '';
+                        if (seenIds.has(taId) && taId) return;
+                        if (taId) seenIds.add(taId);
+                        results.push({ index: idx, label: label, type: 'textarea', id: taId, currentValue: textarea.value || '' });
+                    } else if (textInput) {
+                        const inputId = textInput.id || textInput.name || '';
+                        if (seenIds.has(inputId) && inputId) return;
+                        if (inputId) seenIds.add(inputId);
+                        // Include text inputs even if they have a value (we might want to verify/override)
+                        const currentVal = textInput.value || '';
+                        results.push({ index: idx, label: label, type: 'text', id: inputId, currentValue: currentVal });
                     }
                 });
                 return results;
             }""")
+
+            logger.info(f"[GreenhouseAdapter] Detected {len(custom_questions)} custom questions below standard fields")
 
             for cq in custom_questions:
                 q_label = cq.get("label", "")
                 q_type = cq.get("type", "text")
                 q_opts = cq.get("options", [])
                 q_id = cq.get("id", "")
+                current_val = cq.get("currentValue", "")
 
                 if q_type == "dropdown":
                     match = memory_engine.match_option(q_label, q_opts)
                     if match:
                         chosen = match["matched_option"]
-                        await page.evaluate(f"""(id, chosen) => {{
-                            const sel = document.getElementById(id) || document.querySelector(`[name="${{id}}"]`);
-                            if (sel) {{
-                                for (let opt of sel.options) {{
-                                    if (opt.text.trim().toLowerCase() === chosen.toLowerCase()) {{
-                                        sel.value = opt.value;
-                                        sel.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                                        break;
-                                    }}
-                                }}
-                            }}
-                        }}""", q_id, chosen)
+                        try:
+                            await page.evaluate("""(id, chosen) => {
+                                // Try by id first, then by name
+                                let sel = null;
+                                if (id) {
+                                    sel = document.getElementById(id) || document.querySelector('[name="' + id + '"]');
+                                }
+                                if (!sel) {
+                                    // Fallback: find by label text
+                                    const labels = Array.from(document.querySelectorAll('label'));
+                                    for (const lbl of labels) {
+                                        if (lbl.innerText.trim().replace(/\\s*\\*\\s*$/, '').trim().toLowerCase() === arguments[2].toLowerCase()) {
+                                            const forId = lbl.getAttribute('for');
+                                            if (forId) sel = document.getElementById(forId);
+                                            if (!sel) sel = lbl.closest('.field, div')?.querySelector('select');
+                                            break;
+                                        }
+                                    }
+                                }
+                                if (sel) {
+                                    for (let opt of sel.options) {
+                                        if (opt.text.trim().toLowerCase() === chosen.toLowerCase()) {
+                                            sel.value = opt.value;
+                                            sel.dispatchEvent(new Event('change', { bubbles: true }));
+                                            sel.dispatchEvent(new Event('input', { bubbles: true }));
+                                            break;
+                                        }
+                                    }
+                                }
+                            }""", q_id, chosen, q_label)
+                        except Exception as sel_err:
+                            logger.debug(f"[GreenhouseAdapter] Dropdown select error for '{q_label}': {sel_err}")
+
                         filled_fields.append({
                             "field_label": q_label,
                             "field_id": q_id,
@@ -224,19 +280,40 @@ class GreenhouseAdapter:
                             "options": q_opts,
                             "fieldType": "dropdown"
                         })
+
                 elif q_type == "textarea":
+                    if current_val and len(current_val.strip()) > 5:
+                        continue  # Already has content, skip
                     # Generate authentic answer via AnswerGenerator
                     gen_res = answer_generator.generate_answer(q_label, f"{page_title} {url} {goal_description}")
                     gen_ans = gen_res.get("answer", "")
                     if gen_ans:
-                        await page.evaluate(f"""(id, val) => {{
-                            const ta = document.getElementById(id) || document.querySelector(`[name="${{id}}"]`);
-                            if (ta) {{
-                                ta.value = val;
-                                ta.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                                ta.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                            }}
-                        }}""", q_id, gen_ans[:600])
+                        try:
+                            await page.evaluate("""(id, val, labelText) => {
+                                let ta = null;
+                                if (id) {
+                                    ta = document.getElementById(id) || document.querySelector('[name="' + id + '"]');
+                                }
+                                if (!ta) {
+                                    const labels = Array.from(document.querySelectorAll('label'));
+                                    for (const lbl of labels) {
+                                        if (lbl.innerText.trim().replace(/\\s*\\*\\s*$/, '').trim().toLowerCase() === labelText.toLowerCase()) {
+                                            const forId = lbl.getAttribute('for');
+                                            if (forId) ta = document.getElementById(forId);
+                                            if (!ta) ta = lbl.closest('.field, div')?.querySelector('textarea');
+                                            break;
+                                        }
+                                    }
+                                }
+                                if (ta) {
+                                    ta.value = val;
+                                    ta.dispatchEvent(new Event('input', { bubbles: true }));
+                                    ta.dispatchEvent(new Event('change', { bubbles: true }));
+                                }
+                            }""", q_id, gen_ans[:600], q_label)
+                        except Exception as ta_err:
+                            logger.debug(f"[GreenhouseAdapter] Textarea fill error for '{q_label}': {ta_err}")
+
                         filled_fields.append({
                             "field_label": q_label,
                             "field_id": q_id,
@@ -252,8 +329,64 @@ class GreenhouseAdapter:
                             "reason": "Please fill response",
                             "fieldType": "text"
                         })
+
+                elif q_type == "text":
+                    if current_val and len(current_val.strip()) > 2:
+                        continue  # Already has content, skip
+                    # Try memory engine first
+                    val = memory_engine.get_field_value(q_label)
+                    if not val:
+                        # For questions like "preferred name", use candidate name
+                        q_lower = q_label.lower()
+                        if any(k in q_lower for k in ["prefer", "preferred name", "name you'd prefer", "call you", "nickname"]):
+                            val = full_name
+                        elif any(k in q_lower for k in ["website", "portfolio", "url", "link"]):
+                            val = portfolio_url or github_url or linkedin_url
+
+                    if val:
+                        try:
+                            await page.evaluate("""(id, val, labelText) => {
+                                let inp = null;
+                                if (id) {
+                                    inp = document.getElementById(id) || document.querySelector('[name="' + id + '"]');
+                                }
+                                if (!inp) {
+                                    const labels = Array.from(document.querySelectorAll('label'));
+                                    for (const lbl of labels) {
+                                        if (lbl.innerText.trim().replace(/\\s*\\*\\s*$/, '').trim().toLowerCase() === labelText.toLowerCase()) {
+                                            const forId = lbl.getAttribute('for');
+                                            if (forId) inp = document.getElementById(forId);
+                                            if (!inp) inp = lbl.closest('.field, div')?.querySelector('input');
+                                            break;
+                                        }
+                                    }
+                                }
+                                if (inp) {
+                                    inp.value = val;
+                                    inp.dispatchEvent(new Event('input', { bubbles: true }));
+                                    inp.dispatchEvent(new Event('change', { bubbles: true }));
+                                }
+                            }""", q_id, str(val), q_label)
+                        except Exception as txt_err:
+                            logger.debug(f"[GreenhouseAdapter] Text fill error for '{q_label}': {txt_err}")
+
+                        filled_fields.append({
+                            "field_label": q_label,
+                            "field_id": q_id,
+                            "value": str(val),
+                            "fieldType": "text",
+                            "is_auto_matched": True
+                        })
+                    else:
+                        flagged_fields.append({
+                            "field_label": q_label,
+                            "field_id": q_id,
+                            "reason": "Please fill this field",
+                            "fieldType": "text"
+                        })
+
         except Exception as cq_err:
-            logger.debug(f"[GreenhouseAdapter] Custom question extraction ignored: {cq_err}")
+            logger.warning(f"[GreenhouseAdapter] Custom question extraction error: {cq_err}")
 
         # Step 8: Prepare Review Payload & Stage HITL Permission
         review_payload = {
