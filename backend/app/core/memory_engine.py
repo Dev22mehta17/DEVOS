@@ -558,11 +558,31 @@ Custom Notes: {extra.get('custom_user_notes', '')}
                 if "immediate" in opt.lower():
                     return {"matched_option": opt, "confidence": "high"}
 
-        # --- Internship Duration & Months Availability ---
-        # e.g., "Are you available for 6 months?", "Can you commit for 3-6 months?"
-        if any(k in q_lower for k in ["available for", "months", "duration", "commitment", "6 month", "3 month", "full time intern"]):
+        # --- Internship Duration & Months Availability & Full-Time Commitment ---
+        # e.g., "Are you able to commit to this internship full-time for its 4-month duration?", "Can you commit for 3-6 months?"
+        if any(k in q_lower for k in ["available for", "months", "duration", "commitment", "6 month", "4 month", "3 month", "full time intern", "commit to this internship", "commit to"]):
             for opt in options:
-                if opt.lower().strip() in ["yes", "yes, available", "yes, I am", "yes, can commit"]:
+                if opt.lower().strip() in ["yes", "yes, available", "yes, I am", "yes, can commit", "yes, i can"]:
+                    return {"matched_option": opt, "confidence": "high"}
+                if opt.lower().strip().startswith("yes"):
+                    return {"matched_option": opt, "confidence": "high"}
+
+        # --- Fast-Paced Work Environment & Culture Fit ---
+        # e.g., "Are you able to work effectively in a fast-paced work environment?"
+        if any(k in q_lower for k in ["fast-paced", "fast paced", "work environment", "high pressure", "agile", "startup", "collaborative"]):
+            for opt in options:
+                if opt.lower().strip() in ["yes", "yes, comfortable", "yes, willing", "yes, i am", "yes, able"]:
+                    return {"matched_option": opt, "confidence": "high"}
+                if opt.lower().strip().startswith("yes"):
+                    return {"matched_option": opt, "confidence": "high"}
+
+        # --- Post-Internship Full-Time Conversion / Full-Time Role ---
+        # e.g., "Are you open to a full-time role at LogAI if offered post-internship...?"
+        if any(k in q_lower for k in ["open to a full-time role", "full-time role", "full time role", "post-internship", "post internship", "convert", "return offer", "permanent role"]):
+            for opt in options:
+                if opt.lower().strip() in ["yes", "yes, open", "yes, interested", "yes, absolutely"]:
+                    return {"matched_option": opt, "confidence": "high"}
+                if opt.lower().strip().startswith("yes"):
                     return {"matched_option": opt, "confidence": "high"}
 
         # --- Location & WFO / Relocation / Office Questions ---
@@ -570,6 +590,8 @@ Custom Notes: {extra.get('custom_user_notes', '')}
         if any(k in q_lower for k in ["location", "wfo", "office", "noida", "gurgaon", "gurugram", "bengaluru", "bangalore", "pune", "hyderabad", "delhi", "mumbai", "relocate", "relocation", "on-site", "hybrid", "work from"]):
             for opt in options:
                 if opt.lower().strip() in ["yes", "yes, comfortable", "yes, willing", "yes, open", "yes - wfo"]:
+                    return {"matched_option": opt, "confidence": "high"}
+                if opt.lower().strip().startswith("yes"):
                     return {"matched_option": opt, "confidence": "high"}
 
         # --- Country / Residence ---

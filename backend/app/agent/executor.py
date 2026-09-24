@@ -105,10 +105,11 @@ class AgentExecutor:
                     await emit_agent_event("COMPLETED", f"⚠️ Notice: {form_res.get('message')}")
                     return form_res
 
+                has_payload = bool(form_res.get("payload"))
                 filled_count = len(form_res.get("payload", {}).get("filled_fields", []))
                 flagged_count = len(form_res.get("payload", {}).get("flagged_fields", []))
 
-                if filled_count == 0 and flagged_count == 0:
+                if not has_payload and filled_count == 0 and flagged_count == 0:
                     await emit_agent_event("COMPLETED", f"⚠️ No form fields detected on {target_url}. Page may be restricted or require sign-in.")
                     return form_res
 

@@ -220,7 +220,7 @@ class LinkedInEasyApplyAdapter:
             # Fill phone number if visible
             try:
                 phone_input = await page.query_selector(
-                    'input[id*="phoneNumber"], input[id*="phone-number"], input[name*="phone"], input[aria-label*="Phone"]'
+                    'input[id*="phoneNumber"], input[id*="phone-number"], input[name*="phone"], input[aria-label*="Phone" i]'
                 )
                 if phone_input and await phone_input.is_visible():
                     current_val = await phone_input.input_value()
@@ -232,63 +232,53 @@ class LinkedInEasyApplyAdapter:
                             "fieldType": "text",
                             "is_auto_matched": True
                         })
+                    else:
+                        filled_fields.append({
+                            "field_label": "Phone Number",
+                            "value": current_val,
+                            "fieldType": "text",
+                            "is_auto_matched": True
+                        })
             except Exception as e:
                 logger.debug(f"[LinkedInAdapter] Phone fill ignored: {e}")
 
-            # Answer standard screening questions (Numeric inputs, Yes/No radios)
+            # Check if resume is already attached or upload needed on resume step
             try:
-                # 1. Numeric inputs (Years of experience)
-                num_inputs = await page.query_selector_all('input[type="text"][id*="numeric"], input[type="number"], .fb-single-line-text input')
-                for inp in num_inputs:
-                    if not await inp.is_visible():
-                        continue
-                    lbl_el = await page.evaluate("""(el) => {
-                        const formGroup = el.closest('.fb-form-element, .jobs-easy-apply-form-element, div');
-                        const label = formGroup ? formGroup.querySelector('label, span') : null;
-                        return label ? label.innerText.trim() : '';
-                    }""", inp)
-                    
-                    lbl_lower = (lbl_el or "").lower()
-                    ans_val = "1"  # Default 1 year experience (Amazon internship + projects)
-                    if any(k in lbl_lower for k in ["python", "c++", "java", "dsa", "backend", "software"]):
-                        ans_val = "2"
-                    elif any(k in lbl_lower for k in ["gpa", "cgpa"]):
-                        ans_val = "8.7"
-                    elif "percentage" in lbl_lower:
-                        ans_val = "93.6"
+                resume_card = await page.query_selector('.jobs-document-upload__title, div:has-text("Resume"), label:has-text("Resume")')
+                if resume_card and await resume_card.is_visible():
+                    if best_resume and not any(f.get("field_label") == "Resume / CV" for f in filled_fields):
+                        filled_fields.append({
+                            "field_label": "Resume / CV",
+                            "value": f"[ATTACHED] {best_resume}",
+                            "fieldType": "file",
+                            "is_auto_matched": True
+                        })
+            except Exception as res_err:
+                logger.debug(f"[LinkedInAdapter] Resume check ignored: {res_err}")
 
-                    await inp.fill(ans_val)
-                    filled_fields.append({
-                        "field_label": lbl_el or "Screening Question",
-                        "value": ans_val,
-                        "fieldType": "text",
-                        "is_auto_matched": True
-                    })
-            except Exception as q_err:
-                logger.debug(f"[LinkedInAdapter] Screening question fill ignored: {q_err}")
-
-            # 2. Radio questions (Work Authorization / Sponsorship)
+            # ─── 1. Radio questions (Work Authorization / Degree / Relocation) ───
             try:
-                radios = await page.query_selector_all('fieldset')
-                for fs in radios:
+                fieldsets = await page.query_selector_all('fieldset')
+                for fs in fieldsets:
                     if not await fs.is_visible():
                         continue
                     legend = await page.evaluate("""(el) => {
                         const leg = el.querySelector('legend, span.fb-form-element-label, span[aria-hidden="true"]');
-                        return leg ? leg.innerText.trim().toLowerCase() : '';
+                        return leg ? leg.innerText.trim() : '';
                     }""", fs)
-                    
                     if not legend:
                         continue
+                    leg_clean = re.sub(r'\s*\*+\s*$', '', legend).strip()
+                    leg_lower = leg_clean.lower()
 
                     target_choice = "yes"
-                    if any(k in legend for k in ["sponsorship", "visa", "require sponsorship", "criminal", "drug test"]):
+                    if any(k in leg_lower for k in ["sponsorship", "visa", "require sponsorship", "criminal", "drug test", "restriction"]):
                         target_choice = "no"
-                    elif any(k in legend for k in ["authorized to work", "legally authorized", "bachelor", "degree", "graduat",
-                                                     "willing to relocate", "commute", "comfortable", "available"]):
+                    elif any(k in leg_lower for k in ["authorized to work", "legally authorized", "bachelor", "degree", "graduat",
+                                                     "willing to relocate", "commute", "comfortable", "available", "full-time"]):
                         target_choice = "yes"
 
-                    # Select target radio — click the label AND the input
+                    # Select target radio — click label and update input
                     await page.evaluate("""({fs, target}) => {
                         const labels = Array.from(fs.querySelectorAll('label'));
                         for (let l of labels) {
@@ -305,42 +295,161 @@ class LinkedInEasyApplyAdapter:
                         }
                     }""", {"fs": fs, "target": target_choice})
                     filled_fields.append({
-                        "field_label": legend.title(),
-                        "value": target_choice,
+                        "field_label": leg_clean,
+                        "value": target_choice.capitalize(),
                         "fieldType": "radio",
                         "is_auto_matched": True
                     })
             except Exception as r_err:
                 logger.debug(f"[LinkedInAdapter] Radio answer ignored: {r_err}")
 
-            # 3. Dropdown selects (Country code, City, etc.)
+            # ─── 2. Dropdown Selects (Screening Questions, Availability, Language) ───
             try:
                 selects = await page.query_selector_all('select')
                 for sel in selects:
                     if not await sel.is_visible():
                         continue
-                    sel_label = await page.evaluate("""(el) => {
-                        const formGroup = el.closest('.fb-form-element, .jobs-easy-apply-form-element, div');
-                        const label = formGroup ? formGroup.querySelector('label, span') : null;
-                        return label ? label.innerText.trim().toLowerCase() : '';
+                    sel_data = await page.evaluate("""(el) => {
+                        let label = '';
+                        const formGroup = el.closest('.fb-form-element, .jobs-easy-apply-form-element, .jobs-easy-apply-form-section__grouping, div[data-test-form-element]');
+                        if (formGroup) {
+                            const lbl = formGroup.querySelector('label, span.fb-form-element-label, span[aria-hidden="true"], .t-14');
+                            if (lbl) label = lbl.innerText.trim();
+                        }
+                        if (!label && el.id) {
+                            const lbl = document.querySelector(`label[for="${el.id}"]`);
+                            if (lbl) label = lbl.innerText.trim();
+                        }
+                        if (!label) {
+                            label = el.getAttribute('aria-label') || el.name || '';
+                        }
+                        label = label.replace(/\\s*\\*+\\s*$/, '').trim();
+                        const opts = Array.from(el.options).map(o => o.text.trim()).filter(Boolean);
+                        const currText = el.options[el.selectedIndex] ? el.options[el.selectedIndex].text.trim() : '';
+                        return { id: el.id, name: el.name, label: label, options: opts, currentText: currText };
                     }""", sel)
 
-                    if any(k in sel_label for k in ["country", "phone country"]):
-                        # Select India (+91)
-                        await page.evaluate("""(el) => {
-                            const opts = Array.from(el.options);
-                            const india = opts.find(o => o.text.includes('India') || o.value.includes('IN') || o.text.includes('+91'));
-                            if (india) { el.value = india.value; el.dispatchEvent(new Event('change', {bubbles: true})); }
-                        }""", sel)
-                    elif any(k in sel_label for k in ["city", "location"]):
-                        # Try to select Chandigarh/Delhi/NCR
-                        await page.evaluate("""(el) => {
-                            const opts = Array.from(el.options);
-                            const match = opts.find(o => ['chandigarh', 'delhi', 'ncr', 'gurgaon', 'noida'].some(c => o.text.toLowerCase().includes(c)));
-                            if (match) { el.value = match.value; el.dispatchEvent(new Event('change', {bubbles: true})); }
-                        }""", sel)
+                    q_label = sel_data.get("label", "")
+                    q_opts = sel_data.get("options", [])
+                    curr_text = sel_data.get("currentText", "")
+
+                    if not q_opts or (len(q_opts) == 1 and q_opts[0].lower().startswith("select")):
+                        continue
+
+                    # If already selected a valid answer, record it
+                    if curr_text and curr_text.lower() not in ["select an option", "select", "choose", "--", ""]:
+                        filled_fields.append({
+                            "field_label": q_label or "Dropdown Question",
+                            "value": curr_text,
+                            "fieldType": "dropdown",
+                            "is_auto_matched": True
+                        })
+                        continue
+
+                    chosen = None
+                    # Country code / phone country
+                    if any(k in q_label.lower() for k in ["country", "phone country"]):
+                        india_opt = next((o for o in q_opts if "india" in o.lower() or "+91" in o), None)
+                        if india_opt:
+                            chosen = india_opt
+                    elif any(k in q_label.lower() for k in ["city", "location"]):
+                        city_match = next((o for o in q_opts if any(c in o.lower() for c in ["chandigarh", "delhi", "ncr", "gurgaon", "noida"])), None)
+                        if city_match:
+                            chosen = city_match
+
+                    # Intelligent memory option matching
+                    if not chosen:
+                        match = memory_engine.match_option(q_label, q_opts)
+                        if match:
+                            chosen = match["matched_option"]
+
+                    # Yes / No fallback for screening dropdowns (e.g., commit to internship, hands-on experience, fast-paced)
+                    if not chosen:
+                        has_yes = any(o.lower().strip() == "yes" or o.lower().strip().startswith("yes") for o in q_opts)
+                        has_no = any(o.lower().strip() == "no" or o.lower().strip().startswith("no") for o in q_opts)
+                        if has_yes and has_no:
+                            if any(k in q_label.lower() for k in ["criminal", "sponsorship", "visa", "restriction", "felony", "drug test"]):
+                                chosen = next((o for o in q_opts if o.lower().strip() == "no" or o.lower().strip().startswith("no")), "No")
+                            else:
+                                chosen = next((o for o in q_opts if o.lower().strip() == "yes" or o.lower().strip().startswith("yes")), "Yes")
+
+                    if chosen:
+                        await page.evaluate("""({id, name, chosen}) => {
+                            let sel = null;
+                            if (id) sel = document.getElementById(id);
+                            if (!sel && name) sel = document.querySelector(`select[name="${name}"]`);
+                            if (sel) {
+                                for (let opt of sel.options) {
+                                    if (opt.text.trim().toLowerCase() === chosen.toLowerCase() || opt.value.toLowerCase() === chosen.toLowerCase()) {
+                                        sel.value = opt.value;
+                                        sel.dispatchEvent(new Event('change', { bubbles: true }));
+                                        sel.dispatchEvent(new Event('input', { bubbles: true }));
+                                        break;
+                                    }
+                                }
+                            }
+                        }""", {"id": sel_data.get("id"), "name": sel_data.get("name"), "chosen": chosen})
+
+                        filled_fields.append({
+                            "field_label": q_label or "Screening Question",
+                            "value": chosen,
+                            "fieldType": "dropdown",
+                            "is_auto_matched": True
+                        })
+                    else:
+                        flagged_fields.append({
+                            "field_label": q_label or "Screening Question",
+                            "reason": "Please choose an option",
+                            "options": q_opts,
+                            "fieldType": "dropdown"
+                        })
             except Exception as s_err:
                 logger.debug(f"[LinkedInAdapter] Select/dropdown fill ignored: {s_err}")
+
+            # ─── 3. Numeric & Text Screening Inputs (Years of experience, CGPA, URLs) ───
+            try:
+                inputs = await page.query_selector_all('input[type="text"]:not([id*="phoneNumber"]):not([id*="email"]), input[type="number"]')
+                for inp in inputs:
+                    if not await inp.is_visible():
+                        continue
+                    lbl_el = await page.evaluate("""(el) => {
+                        const formGroup = el.closest('.fb-form-element, .jobs-easy-apply-form-element, .jobs-easy-apply-form-section__grouping, div');
+                        const label = formGroup ? formGroup.querySelector('label, span.fb-form-element-label, span') : null;
+                        return label ? label.innerText.trim() : '';
+                    }""", inp)
+                    lbl_clean = re.sub(r'\s*\*+\s*$', '', lbl_el).strip()
+                    lbl_lower = lbl_clean.lower()
+                    if not lbl_clean:
+                        continue
+
+                    curr_val = await inp.input_value()
+                    if curr_val and len(curr_val.strip()) > 0:
+                        continue  # Already filled
+
+                    ans_val = None
+                    if any(k in lbl_lower for k in ["years of experience", "total experience", "how many years"]):
+                        ans_val = "1"
+                        if any(k in lbl_lower for k in ["python", "c++", "java", "dsa", "backend", "software"]):
+                            ans_val = "2"
+                    elif any(k in lbl_lower for k in ["gpa", "cgpa"]):
+                        ans_val = "8.7"
+                    elif "percentage" in lbl_lower:
+                        ans_val = "93.6"
+                    else:
+                        ans_val = memory_engine.get_field_value(lbl_clean)
+
+                    if ans_val:
+                        await inp.fill(str(ans_val))
+                        filled_fields.append({
+                            "field_label": lbl_clean,
+                            "value": str(ans_val),
+                            "fieldType": "text",
+                            "is_auto_matched": True
+                        })
+            except Exception as q_err:
+                logger.debug(f"[LinkedInAdapter] Screening input fill ignored: {q_err}")
+
+            await asyncio.sleep(1.0)
 
             # Click "Next" or "Review" button to proceed to next step
             next_btn = await page.query_selector(
@@ -349,6 +458,7 @@ class LinkedInEasyApplyAdapter:
             if next_btn and await next_btn.is_visible():
                 logger.info(f"[LinkedInAdapter] Clicking next step ({current_step})...")
                 await next_btn.click()
+                await asyncio.sleep(2.0)
             else:
                 break
 
