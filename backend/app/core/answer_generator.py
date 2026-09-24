@@ -131,8 +131,14 @@ Relevant Achievements & Resume Excerpts:
 Question: "{question}"
 
 Instructions:
-- Tailor the response specifically to the question and company.
-- Highlight relevant experience (e.g. SDE Intern at Amazon, building DevOS agent, Thapar University, backend/cloud skills).
+- READ THE QUESTION CAREFULLY. Answer EXACTLY what is being asked. Do not give a generic "why I want to join" answer for every question.
+- If the question asks about "reason for job change/leaving", explain that you completed your Amazon internship and are now a final-year student seeking full-time roles.
+- If the question asks "why join [company]", then tailor your answer to that specific company.
+- If the question asks about a "challenge" or "project", describe a specific technical project.
+- If the question asks about "strengths/weaknesses", give genuine self-aware answers.
+- If the question asks about "salary/compensation", say you are flexible and open to industry-standard packages.
+- If the question asks about "availability/notice period", say you can start immediately.
+- Highlight relevant experience only when it naturally answers the question.
 - Keep length around {max_words} words.
 - Do not use markdown headers or generic fluff; return ONLY the response text ready to paste into a form.
 """
@@ -169,6 +175,7 @@ Instructions:
         role = prof.get("current_role", "Software Engineer")
         skills = ", ".join(prof.get("skills", ["Python", "FastAPI", "React", "Playwright", "Distributed Systems"])[:5])
         uni = edu.get("university", "Thapar Institute of Engineering & Technology")
+        comp_name = company_info["name"] if company_info else "your organization"
         
         # 1. "Why didn't you get PPO" / "Internship full-time conversion / offer"
         if any(k in q_lower for k in ["ppo", "return offer", "conversion", "why didn't you get", "why not join amazon"]):
@@ -178,31 +185,63 @@ Instructions:
         if any(k in q_lower for k in ["proud", "proudest", "did in your internship", "internship achievement", "best achievement"]):
             return "The proudest achievement during my Amazon SDE internship was engineering and optimizing high-throughput backend services that directly improved payment transaction reliability. I took end-to-end ownership of identifying latency bottlenecks, resolving distributed race conditions, and delivering a customer-facing feature ahead of schedule with comprehensive test coverage and zero production regressions."
 
-        # 3. "Why join [Company]" / "Why do you want to work here"
-        if any(k in q_lower for k in ["why", "interest", "reason", "motivation", "join", "work here", "work with us", "why us"]):
+        # 3. "Reason for job change / leaving / looking for new opportunity"
+        if any(k in q_lower for k in ["reason for looking", "job change", "reason for change", "leaving current", "why leaving",
+                                       "reason for leaving", "looking for a change", "switching", "reason for job"]):
+            return f"I recently completed a 6-month SDE internship at Amazon where I gained valuable production engineering experience with distributed microservices and cloud infrastructure. As a final-year Computer Engineering student at {uni} graduating in 2026, I am actively seeking full-time SDE roles to apply and grow my skills in backend systems, scalable APIs, and cloud architecture. I am looking for a role that offers strong engineering challenges and mentorship in a high-ownership environment."
+
+        # 4. "Why join [Company]" / "Why do you want to work here"
+        if any(k in q_lower for k in ["why do you want to join", "why do you want to work", "why this company",
+                                       "why us", "why work here", "what excites you about",
+                                       "what attracts you", "why are you interested in this"]):
             if company_info:
-                comp_name = company_info["name"]
-                comp_why = company_info["why"]
-                return f"{comp_why} As a Computer Engineering student at {uni} and former SDE Intern at Amazon, I have engineered scalable backend APIs and autonomous systems using {skills}. I am excited to bring my technical ownership, rapid problem-solving, and passion for distributed systems to {comp_name}'s high-impact engineering team."
+                return f"{company_info['why']} As a Computer Engineering student at {uni} and former SDE Intern at Amazon, I bring hands-on experience with scalable backend systems, cloud microservices, and autonomous agent engineering using {skills}. I am eager to contribute my technical ownership and problem-solving skills to {comp_name}'s engineering team."
             else:
-                return f"I am deeply excited by this opportunity because of your team's focus on engineering excellence and technical impact. With my background as an SDE Intern at Amazon building scalable cloud microservices and studying Computer Engineering at {uni}, I thrive in high-ownership engineering environments where I can leverage {skills} to build reliable, high-performance systems."
+                return f"I am excited about this opportunity because of your team's focus on engineering excellence and solving impactful problems at scale. My experience as an SDE Intern at Amazon building cloud microservices, combined with my Computer Engineering studies at {uni}, has prepared me to contribute meaningfully to your engineering team using {skills}."
 
-        # 4. "Tell us about a challenging problem / project / bug"
-        if any(k in q_lower for k in ["challenge", "project", "problem", "bug", "difficult", "achievement"]):
-            return f"During my engineering work, one of the most challenging projects I solved was architecting the DevOS autonomous execution engine to control browser sessions via Chrome DevTools Protocol with real-time SSE streaming. The key challenge was handling asynchronous DOM rendering states and complex multi-frame interactions reliably. I implemented resilient state-synchronization protocols and fallback keyboard automation in Python and Playwright, achieving seamless sub-second automation. This experience strengthened my ability to diagnose distributed race conditions and build resilient systems."
+        # 5. "Tell us about a challenging problem / project / bug"
+        if any(k in q_lower for k in ["challenging", "challenge", "difficult", "hardest problem", "complex project", "bug you fixed", "tough situation"]):
+            return f"During my engineering work, one of the most challenging projects was architecting the DevOS autonomous execution engine to control browser sessions via Chrome DevTools Protocol with real-time SSE streaming. The core challenge was handling asynchronous DOM rendering states and complex multi-frame interactions reliably. I implemented resilient state-synchronization protocols and fallback keyboard automation in Python and Playwright, achieving seamless sub-second automation. This strengthened my ability to diagnose distributed race conditions and build resilient systems."
 
-        # 5. "Tell us about yourself / Walk through your resume / Background"
-        if any(k in q_lower for k in ["about yourself", "background", "introduce", "summary", "walk us through", "tell us about you"]):
-            return f"I am a passionate Software Engineer and Computer Engineering student at {uni} graduating in 2026. I previously worked as an SDE Intern at Amazon, where I engineered scalable cloud microservices and optimized backend API latencies. My core technical strengths span Python, FastAPI, React, Playwright, PostgreSQL, and distributed systems architecture. I love solving hard technical problems with high ownership, from agentic systems to cloud infrastructure."
+        # 6. "Tell us about yourself / Walk through your resume / Background"
+        if any(k in q_lower for k in ["about yourself", "background", "introduce", "summary", "walk us through", "tell us about you", "describe yourself"]):
+            return f"I am a passionate Software Engineer and Computer Engineering student at {uni} graduating in 2026. I worked as an SDE Intern at Amazon, where I engineered scalable cloud microservices and optimized backend API latencies. My core technical strengths include {skills}. I am a hands-on builder with strong ownership who loves solving complex technical problems."
 
-        # 6. "Why should we hire you / What sets you apart"
-        if any(k in q_lower for k in ["hire you", "why you", "sets you apart", "strength", "fit for this role"]):
-            return f"What sets me apart is my strong combination of algorithmic foundation, hands-on production experience from my Amazon SDE internship, and a bias for rapid execution. I have architected full-stack systems from scratch using {skills} and possess a deep curiosity for high-scale backend engineering. I ramp up quickly, take end-to-end ownership of problems, and deliver robust solutions."
+        # 7. "Why should we hire you / What sets you apart"
+        if any(k in q_lower for k in ["hire you", "why you", "sets you apart", "what makes you unique", "fit for this role", "stand out"]):
+            return f"What sets me apart is my strong combination of algorithmic foundation, hands-on production experience from my Amazon SDE internship, and a bias for rapid execution. I have architected full-stack systems from scratch using {skills} and possess a deep curiosity for high-scale backend engineering. I ramp up quickly, take end-to-end ownership, and deliver robust solutions."
 
-        # 5. Generic fallback leveraging vector context
+        # 8. Strengths / Weaknesses
+        if any(k in q_lower for k in ["strength", "weakness", "strong suit", "area of improvement"]):
+            if "weakness" in q_lower or "improvement" in q_lower:
+                return "One area I am actively improving is delegation. As someone who takes deep ownership of technical problems, I sometimes try to solve everything myself rather than leveraging team collaboration early. I have been working on this by proactively seeking code reviews and pair programming to produce better solutions faster."
+            else:
+                return f"My key strengths are technical problem-solving, rapid learning, and taking end-to-end ownership of engineering challenges. During my Amazon SDE internship, I delivered production-grade microservices with comprehensive testing and zero regressions. I am proficient in {skills} and thrive in fast-paced environments."
+
+        # 9. Interest / motivation / passion (generic)
+        if any(k in q_lower for k in ["interest in", "motivation", "passion for", "what drives you", "what inspires"]):
+            return f"I am deeply motivated by building software that solves real problems at scale. My passion for backend engineering and distributed systems was cemented during my Amazon SDE internship, where I saw firsthand how well-architected services handle millions of transactions reliably. I want to continue building systems with high engineering standards, strong ownership, and measurable user impact."
+
+        # 10. Cover letter / general "why" (broad catch-all, but not as greedy)
+        if any(k in q_lower for k in ["cover letter", "letter of interest", "why apply", "reason for applying"]):
+            if company_info:
+                return f"I am applying because {company_info['why']} With my hands-on experience as an SDE Intern at Amazon and my Computer Engineering degree from {uni}, I bring production-grade skills in {skills}. I am eager to contribute to {comp_name}'s mission and grow as a software engineer in a high-impact environment."
+            else:
+                return f"I am applying for this role because it aligns closely with my skills and career goals as a software engineer. My experience at Amazon building scalable cloud microservices, combined with my technical foundation in {skills} from {uni}, positions me well to contribute meaningfully from day one."
+
+        # 11. Availability / start date / notice period
+        if any(k in q_lower for k in ["availability", "when can you start", "start date", "earliest date", "notice period", "immediate"]):
+            notice = prof.get("notice_period", "Immediate")
+            return f"I am available to start {notice.lower()}. As a final-year student at {uni} graduating in 2026, I have full flexibility for immediate joining."
+
+        # 12. Salary / compensation expectations
+        if any(k in q_lower for k in ["salary", "compensation", "ctc", "pay expectation", "remuneration"]):
+            return "I am flexible on compensation and open to discussing a package that is competitive and in line with industry standards for a fresh SDE-1 / entry-level software engineering role. My primary focus is on the technical challenge, growth opportunity, and engineering culture."
+
+        # 13. Generic fallback leveraging vector context
         if relevant_chunks:
             context_text = " ".join([c.strip() for c in relevant_chunks[:2]])
-            return f"Based on my software engineering background at Amazon and {uni}: {context_text}. I am proficient in {skills} and eager to contribute to this role."
+            return f"Based on my engineering background at Amazon and {uni}: {context_text}"
 
         return f"As a Software Engineer with experience at Amazon and a strong foundation in {skills} from {uni}, I bring strong technical problem-solving, high ownership, and a proven track record of building reliable software systems."
 

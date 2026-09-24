@@ -65,6 +65,15 @@ export default function App() {
     };
 
     const pollStream = async () => {
+      // On first load, skip all existing events to avoid replaying stale form reviews
+      try {
+        const initRes = await fetch(`${API_BASE_URL}/api/stream/poll?since=999999`);
+        const initResult = await initRes.json();
+        pollSinceId = initResult.latest_id || 0;
+      } catch (e) {
+        // If fetch fails, start from 0 as fallback
+      }
+
       while (active) {
         try {
           const res = await fetch(`${API_BASE_URL}/api/stream/poll?since=${pollSinceId}`);

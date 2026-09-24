@@ -567,5 +567,36 @@
     ],
     "created_at": "2026-08-29T01:32:17.328611",
     "completed_at": "2026-08-29T01:36:08.621749"
+  },
+  "campaign_bc334701": {
+    "campaign_id": "campaign_bc334701",
+    "title": "Recruiter Outreach (1 emails)",
+    "total_jobs": 1,
+    "scheduled_at": "2026-09-22T15:30:00",
+    "schedule_display": "Sep 22, 3:30 PM",
+    "status": "COMPLETED",
+    "jobs": [
+      {
+        "job_id": "job_1ab3b27d",
+        "campaign_id": "campaign_bc334701",
+        "draft_index": 0,
+        "email": "mehtadev2004@gmail.com",
+        "name": "Mehtadev2004",
+        "company": "Gmail",
+        "role": "Software Development Engineer",
+        "subject": "Application for Software Development Engineer \u2013 Dev Mehta",
+        "body": "Hi Mehtadev2004,\n\nI hope you're doing well.\n\nI'm Dev Mehta, a Computer Engineering graduate from Thapar Institute of Engineering & Technology, and I recently completed a 6-month Software Development Engineer internship at Amazon Pay India.\n\nDuring my internship, I worked on production backend and customer-facing systems, including a multi-marketplace runtime configuration migration and payment-related features using Java, runtime configuration, and feature flagging. I also worked on debugging distributed-system issues and contributed to design documents, code reviews, and operational dashboards.\n\nI'm reaching out to explore Software Development Engineer opportunities at Gmail. I have a strong foundation in C++, Java, Python, DSA, OOP, DBMS, and Computer Networks, along with experience building full-stack projects.\n\nI would really appreciate it if you could consider my profile for any relevant current or upcoming openings at Gmail.\n\nI've attached my resume for your consideration and would be happy to discuss my profile further.\n\nThank you for your time.\n\nBest regards,\nDev Mehta\n\ud83d\udce7 mehtadev2004@gmail.com\n\ud83d\udcf1 +91-7206049507\n\ud83d\udd17 LinkedIn: https://www.linkedin.com/in/dev-mehta-089a86264/\n\ud83d\udcbb GitHub: https://github.com/Dev22mehta17\n\ud83c\udf10 Portfolio: https://zap-go2-0.vercel.app/",
+        "attached_file": "/Users/devmehta/Agent_mac/backend/uploads/DevMehta_CV.pdf",
+        "scheduled_at": "2026-09-22T15:30:00",
+        "status": "SENT",
+        "attempts": 1,
+        "max_retries": 2,
+        "sent_at": "2026-09-22T15:30:22.044369",
+        "error_message": null,
+        "created_at": "2026-09-22T15:17:26.972267"
+      }
+    ],
+    "created_at": "2026-09-22T15:17:26.972315",
+    "completed_at": "2026-09-22T15:30:41.049149"
   }
 }
